@@ -128,6 +128,22 @@ const getProjectTypeLabel = (type, dept) =>
   dept === 'ac'
     ? (type === 'new' ? 'مشروع جديد' : 'مشروع قائم')
     : (type === 'new' ? 'جديد' : 'قديم');
+const LEAD_STATUSES = [
+  { id:'contacted',  label:'تم التواصل',     color:'blue' },
+  { id:'interested', label:'مهتم',            color:'green' },
+  { id:'not_interested', label:'غير مهتم',   color:'slate' },
+  { id:'follow_up',  label:'يحتاج متابعة',   color:'amber' },
+];
+const UNIT_TYPES = [
+  { id:'piece',   label:'قطعة' },
+  { id:'meter',   label:'متر' },
+  { id:'ton',     label:'طن' },
+  { id:'roll',    label:'لفة' },
+  { id:'carton',  label:'كرتونة' },
+  { id:'kg',      label:'كيلو' },
+  { id:'liter',   label:'لتر' },
+  { id:'set',     label:'سواء' },
+];
 const PLAN_STATUSES = [
   { id:'not_started', label:'لم يبدأ' },
   { id:'in_progress', label:'قيد الإعداد' },
@@ -144,6 +160,12 @@ const DB = {
   saveProjects: (p) => localStorage.setItem('hec_projects', JSON.stringify(p)),
   getVisits: () => JSON.parse(localStorage.getItem('hec_visits') || '[]'),
   saveVisits: (v) => localStorage.setItem('hec_visits', JSON.stringify(v)),
+  getClients: () => JSON.parse(localStorage.getItem('hec_clients') || '[]'),
+  saveClients: (c) => localStorage.setItem('hec_clients', JSON.stringify(c)),
+  getLeads: () => JSON.parse(localStorage.getItem('hec_leads') || '[]'),
+  saveLeads: (l) => localStorage.setItem('hec_leads', JSON.stringify(l)),
+  getSuppliers: () => JSON.parse(localStorage.getItem('hec_suppliers') || '[]'),
+  saveSuppliers: (s) => localStorage.setItem('hec_suppliers', JSON.stringify(s)),
   getCurrentUser: () => JSON.parse(sessionStorage.getItem('hec_current') || 'null'),
   setCurrentUser: (u) => sessionStorage.setItem('hec_current', JSON.stringify(u)),
   clearCurrentUser: () => sessionStorage.removeItem('hec_current'),
@@ -337,12 +359,16 @@ function Login({ onLogin }) {
 // ==================== SIDEBAR ====================
 function Sidebar({ user, active, setActive, onLogout, isOpen, onClose }) {
   const managerNav = [
-    { id:'dashboard', icon:'📊', label:'لوحة التحكم' },
-    { id:'engineers', icon:'👷', label:'المهندسين' },
-    { id:'projects', icon:'📋', label:'جميع المشاريع' },
-    { id:'visits', icon:'🗺️', label:'الزيارات الميدانية' },
-    { id:'finance', icon:'💰', label:'التقارير المالية' },
-    { id:'settings', icon:'⚙️', label:'الإعدادات' },
+    { id:'dashboard',     icon:'📊', label:'لوحة التحكم' },
+    { id:'engineers',     icon:'👷', label:'المهندسين' },
+    { id:'projects',      icon:'📋', label:'جميع المشاريع' },
+    { id:'clients',       icon:'🏢', label:'العملاء' },
+    { id:'leads',         icon:'🎯', label:'العملاء المحتملين' },
+    { id:'suppliers',     icon:'📦', label:'الموردين' },
+    { id:'visits',        icon:'🗺️', label:'الزيارات الميدانية' },
+    { id:'finance',       icon:'💰', label:'التقارير المالية' },
+    { id:'acc_dashboard', icon:'🧾', label:'لوحة المحاسب' },
+    { id:'settings',      icon:'⚙️', label:'الإعدادات' },
   ];
   const engineerNav = [
     { id:'my_projects', icon:'📋', label:'مشاريعي' },
@@ -1571,6 +1597,359 @@ function VisitsPage({ user }) {
   );
 }
 
+// ==================== CLIENTS PAGE ====================
+function ClientsPage({ onSelectProject }) {
+  const [clients, setClients] = useState(DB.getClients());
+  const [projects, setProjects] = useState(DB.getProjects());
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name:'', phone:'', email:'', company:'', notes:'' });
+  const [search, setSearch] = useState('');
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  // Auto-sync clients from projects
+  useEffect(() => {
+    const stored = DB.getClients();
+    const allProjs = DB.getProjects();
+    let updated = [...stored];
+    allProjs.forEach(p => {
+      if (p.clientName && !updated.find(c => c.name === p.clientName)) {
+        updated.push({ id: uid(), name: p.clientName, phone: p.clientPhone||'', email:'', company:'', notes:'', createdAt: p.createdAt||new Date().toISOString().slice(0,10) });
+      }
+    });
+    if (updated.length !== stored.length) { DB.saveClients(updated); setClients(updated); }
+  }, []);
+
+  const addClient = () => {
+    if (!form.name) return;
+    const c = { ...form, id: uid(), createdAt: new Date().toISOString().slice(0,10) };
+    const updated = [...DB.getClients(), c];
+    DB.saveClients(updated); setClients(updated);
+    setForm({ name:'', phone:'', email:'', company:'', notes:'' }); setShowAdd(false);
+  };
+
+  const deleteClient = (id) => {
+    if (!confirm('حذف العميل؟')) return;
+    const updated = DB.getClients().filter(c=>c.id!==id);
+    DB.saveClients(updated); setClients(updated);
+  };
+
+  const filtered = clients.filter(c => !search || c.name.includes(search) || (c.phone||'').includes(search));
+
+  const getClientProjects = (name) => projects.filter(p => p.clientName === name);
+
+  return (
+    <div className="fade-in space-y-5">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">🏢 العملاء</h2>
+          <p className="text-slate-500 text-sm mt-1">{clients.length} عميل مسجل</p>
+        </div>
+        <Btn onClick={()=>setShowAdd(true)}>➕ عميل جديد</Btn>
+      </div>
+
+      <input className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        placeholder="بحث باسم العميل أو رقم الجوال..." value={search} onChange={e=>setSearch(e.target.value)}/>
+
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl card-shadow p-10 text-center text-slate-400">
+          <div className="text-4xl mb-2">🏢</div><div>لا يوجد عملاء بعد</div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {filtered.map(c => {
+            const cProjects = getClientProjects(c.name);
+            const totalBudget = cProjects.reduce((s,p)=>s+Number(p.budget||0),0);
+            return (
+              <div key={c.id} className="bg-white rounded-2xl card-shadow p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg">{c.name.charAt(0)}</div>
+                    <div>
+                      <div className="font-bold text-slate-800">{c.name}</div>
+                      {c.company && <div className="text-xs text-slate-400">{c.company}</div>}
+                    </div>
+                  </div>
+                  <button onClick={()=>deleteClient(c.id)} className="text-slate-300 hover:text-red-400 transition text-sm p-1">🗑️</button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                  {c.phone && <div className="bg-slate-50 rounded-lg p-2"><span className="text-slate-400">📞 </span>{c.phone}</div>}
+                  {c.email && <div className="bg-slate-50 rounded-lg p-2 truncate"><span className="text-slate-400">✉️ </span>{c.email}</div>}
+                </div>
+                <div className="border-t border-slate-50 pt-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-semibold text-slate-500">المشاريع ({cProjects.length})</span>
+                    {totalBudget>0 && <span className="text-xs font-bold text-blue-600">{fmt(totalBudget)} ر.س</span>}
+                  </div>
+                  {cProjects.length === 0 ? (
+                    <div className="text-xs text-slate-300 text-center py-2">لا توجد مشاريع</div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {cProjects.slice(0,3).map(p=>(
+                        <button key={p.id} onClick={()=>onSelectProject(p)}
+                          className="w-full flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50 hover:bg-blue-50 transition">
+                          <span className="text-slate-600 font-medium">{p.projectNo} — {getLabelById(ALL_SERVICE_TYPES,p.serviceType)}</span>
+                          <Badge status={p.status}/>
+                        </button>
+                      ))}
+                      {cProjects.length>3 && <div className="text-xs text-slate-400 text-center">+{cProjects.length-3} مشاريع أخرى</div>}
+                    </div>
+                  )}
+                </div>
+                {c.notes && <div className="mt-2 text-xs text-slate-400 bg-slate-50 rounded-lg p-2">{c.notes}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Modal open={showAdd} onClose={()=>setShowAdd(false)} title="إضافة عميل جديد">
+        <div className="space-y-4">
+          <Input label="اسم العميل" value={form.name} onChange={e=>set('name',e.target.value)} required/>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="رقم الجوال" value={form.phone} onChange={e=>set('phone',e.target.value)}/>
+            <Input label="البريد الإلكتروني" value={form.email} onChange={e=>set('email',e.target.value)}/>
+          </div>
+          <Input label="اسم الشركة / المنشأة" value={form.company} onChange={e=>set('company',e.target.value)}/>
+          <Textarea label="ملاحظات" value={form.notes} onChange={e=>set('notes',e.target.value)}/>
+          <div className="flex gap-3">
+            <Btn onClick={addClient} className="flex-1">✅ حفظ</Btn>
+            <Btn variant="secondary" onClick={()=>setShowAdd(false)} className="flex-1">إلغاء</Btn>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ==================== LEADS PAGE ====================
+function LeadsPage() {
+  const [leads, setLeads] = useState(DB.getLeads());
+  const [showAdd, setShowAdd] = useState(false);
+  const [editLead, setEditLead] = useState(null);
+  const [filterStatus, setFilterStatus] = useState('');
+  const [form, setForm] = useState({ name:'', phone:'', company:'', serviceInterest:'', status:'contacted', notes:'', followUpDate:'' });
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const reload = () => setLeads(DB.getLeads());
+
+  const statusColors = { contacted:'bg-blue-50 text-blue-700 border-blue-200', interested:'bg-green-50 text-green-700 border-green-200', not_interested:'bg-slate-100 text-slate-500 border-slate-200', follow_up:'bg-amber-50 text-amber-700 border-amber-200' };
+
+  const saveLead = () => {
+    if (!form.name) return;
+    if (editLead) {
+      const updated = DB.getLeads().map(l=>l.id===editLead ? {...l,...form,updatedAt:new Date().toISOString().slice(0,10)} : l);
+      DB.saveLeads(updated);
+    } else {
+      DB.saveLeads([...DB.getLeads(), {...form, id:uid(), createdAt:new Date().toISOString().slice(0,10)}]);
+    }
+    reload(); setShowAdd(false); setEditLead(null);
+    setForm({ name:'', phone:'', company:'', serviceInterest:'', status:'contacted', notes:'', followUpDate:'' });
+  };
+
+  const openEdit = (l) => { setForm({...l}); setEditLead(l.id); setShowAdd(true); };
+
+  const deleteLead = (id) => {
+    if (!confirm('حذف العميل المحتمل؟')) return;
+    DB.saveLeads(DB.getLeads().filter(l=>l.id!==id)); reload();
+  };
+
+  const updateStatus = (id, status) => {
+    DB.saveLeads(DB.getLeads().map(l=>l.id===id?{...l,status,updatedAt:new Date().toISOString().slice(0,10)}:l));
+    reload();
+  };
+
+  const filtered = filterStatus ? leads.filter(l=>l.status===filterStatus) : leads;
+  const counts = LEAD_STATUSES.reduce((a,s)=>({...a,[s.id]:leads.filter(l=>l.status===s.id).length}),{});
+
+  return (
+    <div className="fade-in space-y-5">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">🎯 العملاء المحتملين</h2>
+          <p className="text-slate-500 text-sm mt-1">{leads.length} عميل محتمل</p>
+        </div>
+        <Btn onClick={()=>{setEditLead(null);setForm({name:'',phone:'',company:'',serviceInterest:'',status:'contacted',notes:'',followUpDate:''});setShowAdd(true);}}>➕ إضافة</Btn>
+      </div>
+
+      {/* Status filter cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {LEAD_STATUSES.map(s=>(
+          <button key={s.id} onClick={()=>setFilterStatus(filterStatus===s.id?'':s.id)}
+            className={`rounded-xl p-3 text-right border transition ${filterStatus===s.id?'ring-2 ring-blue-500':''} ${statusColors[s.id]||'bg-white border-slate-200'}`}>
+            <div className="text-xl font-bold">{counts[s.id]||0}</div>
+            <div className="text-xs font-medium mt-0.5">{s.label}</div>
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl card-shadow p-10 text-center text-slate-400">
+          <div className="text-4xl mb-2">🎯</div><div>لا يوجد عملاء محتملين</div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl card-shadow overflow-hidden">
+          <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 bg-slate-50 text-xs font-semibold text-slate-500 border-b border-slate-100">
+            <div className="col-span-3">الاسم</div><div className="col-span-2">الجوال</div>
+            <div className="col-span-2">الخدمة المطلوبة</div><div className="col-span-2">الحالة</div>
+            <div className="col-span-2">متابعة</div><div className="col-span-1"></div>
+          </div>
+          {filtered.map(l=>(
+            <div key={l.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 px-5 py-4 border-b border-slate-50 hover:bg-slate-50/50 transition items-center">
+              <div className="md:col-span-3">
+                <div className="font-semibold text-slate-800 text-sm">{l.name}</div>
+                {l.company && <div className="text-xs text-slate-400">{l.company}</div>}
+              </div>
+              <div className="md:col-span-2 text-sm text-slate-600">{l.phone||'-'}</div>
+              <div className="md:col-span-2 text-xs text-slate-500">{l.serviceInterest||'-'}</div>
+              <div className="md:col-span-2">
+                <select value={l.status} onChange={e=>updateStatus(l.id,e.target.value)}
+                  className={`text-xs px-2 py-1 rounded-lg border font-medium w-full ${statusColors[l.status]||''}`}>
+                  {LEAD_STATUSES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+                </select>
+              </div>
+              <div className="md:col-span-2 text-xs text-slate-500">{l.followUpDate?fmtDate(l.followUpDate):'-'}</div>
+              <div className="md:col-span-1 flex gap-1 justify-end">
+                <button onClick={()=>openEdit(l)} className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition text-sm">✏️</button>
+                <button onClick={()=>deleteLead(l.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition text-sm">🗑️</button>
+              </div>
+              {l.notes && <div className="md:col-span-12 text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-1.5 mt-1">{l.notes}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Modal open={showAdd} onClose={()=>{setShowAdd(false);setEditLead(null);}} title={editLead?'تعديل العميل المحتمل':'إضافة عميل محتمل'}>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="الاسم" value={form.name} onChange={e=>set('name',e.target.value)} required/>
+            <Input label="رقم الجوال" value={form.phone} onChange={e=>set('phone',e.target.value)}/>
+          </div>
+          <Input label="الشركة / المنشأة" value={form.company} onChange={e=>set('company',e.target.value)}/>
+          <Input label="الخدمة التي يطلبها" value={form.serviceInterest} onChange={e=>set('serviceInterest',e.target.value)} placeholder="مثال: إشراف هندسي، تكييف مركزي..."/>
+          <div className="grid grid-cols-2 gap-3">
+            <Select label="الحالة" value={form.status} onChange={e=>set('status',e.target.value)}>
+              {LEAD_STATUSES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+            </Select>
+            <Input label="تاريخ المتابعة" type="date" value={form.followUpDate} onChange={e=>set('followUpDate',e.target.value)}/>
+          </div>
+          <Textarea label="ملاحظات" value={form.notes} onChange={e=>set('notes',e.target.value)} placeholder="تفاصيل الاستفسار أو الاتصال..."/>
+          <div className="flex gap-3">
+            <Btn onClick={saveLead} className="flex-1">✅ حفظ</Btn>
+            <Btn variant="secondary" onClick={()=>{setShowAdd(false);setEditLead(null);}} className="flex-1">إلغاء</Btn>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ==================== SUPPLIERS PAGE ====================
+function SuppliersPage() {
+  const [suppliers, setSuppliers] = useState(DB.getSuppliers());
+  const [showAdd, setShowAdd] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [search, setSearch] = useState('');
+  const [form, setForm] = useState({ name:'', phone:'', supplyType:'', pricePerUnit:'', unitType:'piece', notes:'' });
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const reload = () => setSuppliers(DB.getSuppliers());
+
+  const saveSupplier = () => {
+    if (!form.name) return;
+    if (editId) {
+      DB.saveSuppliers(DB.getSuppliers().map(s=>s.id===editId?{...s,...form}:s));
+    } else {
+      DB.saveSuppliers([...DB.getSuppliers(), {...form, id:uid(), createdAt:new Date().toISOString().slice(0,10)}]);
+    }
+    reload(); setShowAdd(false); setEditId(null);
+    setForm({ name:'', phone:'', supplyType:'', pricePerUnit:'', unitType:'piece', notes:'' });
+  };
+
+  const openEdit = (s) => { setForm({...s}); setEditId(s.id); setShowAdd(true); };
+
+  const deleteSupplier = (id) => {
+    if (!confirm('حذف المورد؟')) return;
+    DB.saveSuppliers(DB.getSuppliers().filter(s=>s.id!==id)); reload();
+  };
+
+  const filtered = suppliers.filter(s => !search || s.name.includes(search) || (s.supplyType||'').includes(search));
+
+  return (
+    <div className="fade-in space-y-5">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">📦 الموردين</h2>
+          <p className="text-slate-500 text-sm mt-1">{suppliers.length} مورد مسجل</p>
+        </div>
+        <Btn onClick={()=>{setEditId(null);setForm({name:'',phone:'',supplyType:'',pricePerUnit:'',unitType:'piece',notes:''});setShowAdd(true);}}>➕ مورد جديد</Btn>
+      </div>
+
+      <input className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+        placeholder="بحث باسم المورد أو نوع المواد..." value={search} onChange={e=>setSearch(e.target.value)}/>
+
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl card-shadow p-10 text-center text-slate-400">
+          <div className="text-4xl mb-2">📦</div><div>لا يوجد موردين بعد</div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl card-shadow overflow-hidden">
+          <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 bg-slate-50 text-xs font-semibold text-slate-500 border-b border-slate-100">
+            <div className="col-span-3">اسم المورد</div>
+            <div className="col-span-2">رقم التواصل</div>
+            <div className="col-span-3">المواد / الخدمة</div>
+            <div className="col-span-2">السعر بالوحدة</div>
+            <div className="col-span-1">الوحدة</div>
+            <div className="col-span-1"></div>
+          </div>
+          {filtered.map(s=>(
+            <div key={s.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 px-5 py-4 border-b border-slate-50 hover:bg-slate-50/50 transition items-center">
+              <div className="md:col-span-3">
+                <div className="font-semibold text-slate-800 text-sm">{s.name}</div>
+              </div>
+              <div className="md:col-span-2 text-sm text-slate-600">{s.phone||'-'}</div>
+              <div className="md:col-span-3 text-sm text-slate-600">{s.supplyType||'-'}</div>
+              <div className="md:col-span-2">
+                {s.pricePerUnit ? (
+                  <span className="font-bold text-blue-700">{fmt(s.pricePerUnit)} ر.س</span>
+                ) : <span className="text-slate-300 text-xs">لم يحدد</span>}
+              </div>
+              <div className="md:col-span-1">
+                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg font-medium">
+                  {getLabelById(UNIT_TYPES, s.unitType)||s.unitType}
+                </span>
+              </div>
+              <div className="md:col-span-1 flex gap-1 justify-end">
+                <button onClick={()=>openEdit(s)} className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition text-sm">✏️</button>
+                <button onClick={()=>deleteSupplier(s.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition text-sm">🗑️</button>
+              </div>
+              {s.notes && <div className="md:col-span-12 text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-1.5">{s.notes}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Modal open={showAdd} onClose={()=>{setShowAdd(false);setEditId(null);}} title={editId?'تعديل مورد':'إضافة مورد جديد'}>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="اسم المورد" value={form.name} onChange={e=>set('name',e.target.value)} required/>
+            <Input label="رقم التواصل" value={form.phone} onChange={e=>set('phone',e.target.value)}/>
+          </div>
+          <Input label="ماذا يورد" value={form.supplyType} onChange={e=>set('supplyType',e.target.value)} placeholder="مثال: مواسير بولي، عوازل، مكيفات سبليت..."/>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="السعر بالوحدة (ر.س)" type="number" value={form.pricePerUnit} onChange={e=>set('pricePerUnit',e.target.value)} placeholder="0"/>
+            <Select label="الوحدة" value={form.unitType} onChange={e=>set('unitType',e.target.value)}>
+              {UNIT_TYPES.map(u=><option key={u.id} value={u.id}>{u.label}</option>)}
+            </Select>
+          </div>
+          <Textarea label="ملاحظات" value={form.notes} onChange={e=>set('notes',e.target.value)} placeholder="شروط الدفع، أوقات التسليم، ملاحظات أخرى..."/>
+          <div className="flex gap-3">
+            <Btn onClick={saveSupplier} className="flex-1">✅ حفظ</Btn>
+            <Btn variant="secondary" onClick={()=>{setShowAdd(false);setEditId(null);}} className="flex-1">إلغاء</Btn>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
 // ==================== ACCOUNTANT DASHBOARD ====================
 function AccountantDashboard({ onGoFinance, onGoProjects }) {
   const projects = DB.getProjects();
@@ -1906,6 +2285,9 @@ function App() {
       case 'my_visits':     return <VisitsPage user={user}/>;
       case 'finance':       return <FinanceReport/>;
       case 'add_project':   return <AddProject user={user} onSave={handleProjectSaved} onCancel={()=>setActive('my_projects')}/>;
+      case 'clients':       return <ClientsPage onSelectProject={handleSelectProject}/>;
+      case 'leads':         return <LeadsPage/>;
+      case 'suppliers':     return <SuppliersPage/>;
       case 'settings':      return <Settings/>;
       // Accountant routes
       case 'acc_dashboard': return <AccountantDashboard onGoFinance={()=>handleNav('acc_finance')} onGoProjects={()=>handleNav('acc_projects')}/>;
