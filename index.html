@@ -379,9 +379,11 @@ function Sidebar({ user, active, setActive, onLogout, isOpen, onClose }) {
     { id:'acc_dashboard', icon:'📊', label:'لوحة المحاسب' },
     { id:'acc_projects',  icon:'📋', label:'المشاريع' },
     { id:'acc_finance',   icon:'💰', label:'المالية والفواتير' },
+    { id:'suppliers',     icon:'📦', label:'الموردين' },
     { id:'acc_erp',       icon:'🔗', label:'ربط النظام المالي' },
   ];
-  const nav = user.role==='manager' ? managerNav : user.role==='accountant' ? accountantNav : engineerNav;
+  const acEngineerExtra = user.department === 'ac' ? [{ id:'suppliers', icon:'📦', label:'الموردين' }] : [];
+  const nav = user.role==='manager' ? managerNav : user.role==='accountant' ? accountantNav : [...engineerNav, ...acEngineerExtra];
   const dept = DEPARTMENTS.find(d=>d.id===user.department);
   const roleLabel = user.role==='manager'?'مدير عام':user.role==='accountant'?'محاسب':dept?.label||'';
 
@@ -813,6 +815,9 @@ function ProjectDetail({ projectId, user, onBack }) {
   const [invForm, setInvForm] = useState({ amount:'', date:'', description:'', collected:false });
   const [payForm, setPayForm] = useState({ amount:'', dueDate:'', description:'', paid:false });
   const [visitForm, setVisitForm] = useState({ date:'', time:'', location:'', purpose:'', notes:'' });
+  const [showAddSupplier, setShowAddSupplier] = useState(false);
+  const [supplierForm, setSupplierForm] = useState({ supplierId:'', name:'', supplyType:'', unitType:'piece', qty:'', pricePerUnit:'', notes:'' });
+  const setSupFld = (k,v) => setSupplierForm(f=>({...f,[k]:v}));
 
   const load = () => {
     const p = DB.getProjects().find(x=>x.id===projectId);
@@ -921,16 +926,80 @@ function ProjectDetail({ projectId, user, onBack }) {
 
   const fmtSize = (b) => b>1024*1024 ? (b/1024/1024).toFixed(1)+' MB' : (b/1024).toFixed(0)+' KB';
 
+  const addProjSupplier = () => {
+    if (!supplierForm.name && !supplierForm.supplierId) return;
+    let entry = { ...supplierForm, id: uid(), qty: Number(supplierForm.qty)||0, pricePerUnit: Number(supplierForm.pricePerUnit)||0 };
+    if (supplierForm.supplierId) {
+      const gs = DB.getSuppliers().find(s=>s.id===supplierForm.supplierId);
+      if (gs) { entry.name = gs.name; entry.supplyType = entry.supplyType||gs.supplyType; entry.unitType = entry.unitType||gs.unitType; if(!entry.pricePerUnit) entry.pricePerUnit = Number(gs.pricePerUnit)||0; }
+    }
+    const updated = { ...project, projSuppliers: [...(project.projSuppliers||[]), entry] };
+    DB.saveProjects(DB.getProjects().map(p=>p.id===projectId?updated:p));
+    setSupplierForm({ supplierId:'', name:'', supplyType:'', unitType:'piece', qty:'', pricePerUnit:'', notes:'' });
+    setShowAddSupplier(false); load();
+  };
+
+  const removeProjSupplier = (sid) => {
+    if (!confirm('إزالة المورد من المشروع؟')) return;
+    const updated = { ...project, projSuppliers: (project.projSuppliers||[]).filter(s=>s.id!==sid) };
+    DB.saveProjects(DB.getProjects().map(p=>p.id===projectId?updated:p));
+    load();
+  };
+
+  const exportQuote = () => {
+    const ps = project.projSuppliers||[];
+    const total = ps.reduce((s,r)=>s+(r.qty*r.pricePerUnit),0);
+    const rows = ps.map((r,i)=>`
+      <tr>
+        <td>${i+1}</td><td>${r.name}</td><td>${r.supplyType||'-'}</td>
+        <td>${r.qty}</td><td>${getLabelById(UNIT_TYPES,r.unitType)||r.unitType}</td>
+        <td>${r.pricePerUnit.toLocaleString('ar-SA')} ر.س</td>
+        <td><strong>${(r.qty*r.pricePerUnit).toLocaleString('ar-SA')} ر.س</strong></td>
+      </tr>`).join('');
+    const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+      <title>عرض سعر - ${project.clientName}</title>
+      <style>
+        body{font-family:Tajawal,Arial,sans-serif;margin:30px;color:#1e293b;direction:rtl}
+        h1{color:#1e3a5f;font-size:22px;margin-bottom:4px}
+        .meta{color:#64748b;font-size:13px;margin-bottom:24px}
+        table{width:100%;border-collapse:collapse;font-size:14px}
+        th{background:#1e3a5f;color:#fff;padding:10px 12px;text-align:right}
+        td{padding:9px 12px;border-bottom:1px solid #e2e8f0;text-align:right}
+        tr:nth-child(even) td{background:#f8fafc}
+        .total-row td{background:#eff6ff;font-weight:bold;color:#1e3a5f;font-size:15px}
+        .footer{margin-top:30px;font-size:12px;color:#94a3b8;text-align:center}
+        @media print{body{margin:15px}}
+      </style></head><body>
+      <h1>الحمدان للاستشارات الهندسية</h1>
+      <div class="meta">
+        عرض سعر للمشروع: <strong>${project.clientName}</strong> &nbsp;|&nbsp;
+        رقم المشروع: ${project.projectNo} &nbsp;|&nbsp;
+        التاريخ: ${new Date().toLocaleDateString('ar-SA')}
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>المورد</th><th>المواد / الخدمة</th><th>الكمية</th><th>الوحدة</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
+        <tbody>${rows}
+          <tr class="total-row"><td colspan="6" style="text-align:left">الإجمالي الكلي</td><td>${total.toLocaleString('ar-SA')} ر.س</td></tr>
+        </tbody>
+      </table>
+      <div class="footer">الحمدان للاستشارات الهندسية — وثيقة عرض سعر</div>
+      <script>window.onload=()=>window.print();</script>
+      </body></html>`;
+    const w = window.open('','_blank'); w.document.write(html); w.document.close();
+  };
+
   if (!project) return <div className="text-center py-20 text-slate-400">جاري التحميل...</div>;
 
   const totalCollected = project.invoices.filter(i=>i.collected).reduce((s,i)=>s+Number(i.amount),0);
   const totalRemaining = project.payments.filter(pp=>!pp.paid).reduce((s,pp)=>s+Number(pp.amount),0);
+  const isAC = project.department === 'ac';
 
   const tabs = [
     {id:'info',label:'معلومات المشروع'},
     {id:'finance',label:'المالية'},
     {id:'visits',label:`الزيارات الميدانية (${visits.length})`},
     {id:'files',label:`الملفات ${(project.attachments||[]).length>0?'('+project.attachments.length+')':''}`},
+    ...(isAC ? [{id:'suppliers',label:`الموردين وعروض الأسعار ${(project.projSuppliers||[]).length>0?'('+(project.projSuppliers.length)+')':''}`}] : []),
   ];
 
   return (
@@ -1316,6 +1385,106 @@ function ProjectDetail({ projectId, user, onBack }) {
           )}
         </div>
       )}
+
+      {/* Suppliers & Quotation Tab */}
+      {tab==='suppliers' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="font-bold text-slate-700">📦 الموردين المرتبطين بالمشروع</h3>
+              <p className="text-xs text-slate-400 mt-0.5">أضف الموردين والكميات لإنشاء عرض سعر</p>
+            </div>
+            <div className="flex gap-2">
+              {(project.projSuppliers||[]).length>0 && (
+                <button onClick={exportQuote} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition">🖨️ طباعة عرض السعر</button>
+              )}
+              {canEdit && (
+                <Btn onClick={()=>{setSupplierForm({supplierId:'',name:'',supplyType:'',unitType:'piece',qty:'',pricePerUnit:'',notes:''});setShowAddSupplier(true);}}>➕ إضافة مورد</Btn>
+              )}
+            </div>
+          </div>
+
+          {(project.projSuppliers||[]).length===0 ? (
+            <div className="bg-white rounded-2xl card-shadow p-10 text-center text-slate-400">
+              <div className="text-4xl mb-2">📦</div>
+              <div>لم يُضف أي مورد لهذا المشروع بعد</div>
+              <div className="text-xs mt-1">أضف الموردين مع الكميات والأسعار لتتمكن من طباعة عرض سعر</div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl card-shadow overflow-hidden">
+              <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 bg-slate-50 text-xs font-semibold text-slate-500 border-b border-slate-100">
+                <div className="col-span-3">المورد</div>
+                <div className="col-span-2">المواد / الخدمة</div>
+                <div className="col-span-1">الكمية</div>
+                <div className="col-span-1">الوحدة</div>
+                <div className="col-span-2">سعر الوحدة</div>
+                <div className="col-span-2">الإجمالي</div>
+                <div className="col-span-1"></div>
+              </div>
+              {(project.projSuppliers||[]).map(r=>{
+                const lineTotal = (Number(r.qty)||0)*(Number(r.pricePerUnit)||0);
+                return (
+                  <div key={r.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 px-5 py-4 border-b border-slate-50 hover:bg-slate-50/50 transition items-center">
+                    <div className="md:col-span-3 font-semibold text-slate-800 text-sm">{r.name}</div>
+                    <div className="md:col-span-2 text-sm text-slate-600">{r.supplyType||'-'}</div>
+                    <div className="md:col-span-1 text-sm font-medium">{r.qty}</div>
+                    <div className="md:col-span-1"><span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">{getLabelById(UNIT_TYPES,r.unitType)||r.unitType}</span></div>
+                    <div className="md:col-span-2 text-sm text-blue-700 font-medium">{fmt(r.pricePerUnit)} ر.س</div>
+                    <div className="md:col-span-2 text-sm font-bold text-emerald-700">{fmt(lineTotal)} ر.س</div>
+                    <div className="md:col-span-1 flex justify-end">
+                      {canEdit && <button onClick={()=>removeProjSupplier(r.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition text-sm">🗑️</button>}
+                    </div>
+                    {r.notes && <div className="md:col-span-12 text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-1.5">{r.notes}</div>}
+                  </div>
+                );
+              })}
+              <div className="px-5 py-4 bg-blue-50 border-t-2 border-blue-200 flex justify-between items-center">
+                <span className="font-bold text-slate-700">الإجمالي الكلي</span>
+                <span className="text-xl font-bold text-blue-700">{fmt((project.projSuppliers||[]).reduce((s,r)=>s+(Number(r.qty)||0)*(Number(r.pricePerUnit)||0),0))} ر.س</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Supplier to Project Modal */}
+      <Modal open={showAddSupplier} onClose={()=>setShowAddSupplier(false)} title="إضافة مورد للمشروع">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">اختر من قائمة الموردين (اختياري)</label>
+            <select className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              value={supplierForm.supplierId}
+              onChange={e=>{
+                const sid=e.target.value; setSupFld('supplierId',sid);
+                if(sid){ const gs=DB.getSuppliers().find(s=>s.id===sid); if(gs){ setSupplierForm(f=>({...f,supplierId:sid,name:gs.name,supplyType:gs.supplyType||'',unitType:gs.unitType||'piece',pricePerUnit:gs.pricePerUnit||''})); } }
+              }}>
+              <option value="">— إدخال يدوي أو اختر مورد —</option>
+              {DB.getSuppliers().map(s=><option key={s.id} value={s.id}>{s.name} — {s.supplyType||'—'}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="اسم المورد" value={supplierForm.name} onChange={e=>setSupFld('name',e.target.value)} required/>
+            <Input label="المواد / الخدمة" value={supplierForm.supplyType} onChange={e=>setSupFld('supplyType',e.target.value)}/>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Input label="الكمية" type="number" value={supplierForm.qty} onChange={e=>setSupFld('qty',e.target.value)} placeholder="0"/>
+            <Select label="الوحدة" value={supplierForm.unitType} onChange={e=>setSupFld('unitType',e.target.value)}>
+              {UNIT_TYPES.map(u=><option key={u.id} value={u.id}>{u.label}</option>)}
+            </Select>
+            <Input label="سعر الوحدة (ر.س)" type="number" value={supplierForm.pricePerUnit} onChange={e=>setSupFld('pricePerUnit',e.target.value)} placeholder="0"/>
+          </div>
+          {(Number(supplierForm.qty)||0)>0 && (Number(supplierForm.pricePerUnit)||0)>0 && (
+            <div className="bg-blue-50 rounded-xl px-4 py-3 text-sm font-bold text-blue-700">
+              الإجمالي: {fmt((Number(supplierForm.qty))*(Number(supplierForm.pricePerUnit)))} ر.س
+            </div>
+          )}
+          <Textarea label="ملاحظات" value={supplierForm.notes} onChange={e=>setSupFld('notes',e.target.value)} placeholder="شروط الدفع، موعد التسليم..."/>
+          <div className="flex gap-3">
+            <Btn onClick={addProjSupplier} className="flex-1">✅ إضافة</Btn>
+            <Btn variant="secondary" onClick={()=>setShowAddSupplier(false)} className="flex-1">إلغاء</Btn>
+          </div>
+        </div>
+      </Modal>
 
       {/* Modals */}
       <Modal open={showInvoice} onClose={()=>setShowInvoice(false)} title="إضافة فاتورة">
