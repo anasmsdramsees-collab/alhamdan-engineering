@@ -1086,22 +1086,47 @@ function AddProject({ user, onSave, onCancel }) {
 
 // ==================== VISITS PAGE ====================
 function VisitsPage({ user }) {
-  const projects = DB.getProjects();
+  const [allProjects, setAllProjects] = useState(DB.getProjects());
   const engineers = DB.getUsers().filter(u=>u.role==='engineer');
-  const allVisits = DB.getVisits();
-  const visits = user.role==='engineer' ? allVisits.filter(v=>v.engineerId===user.id) : allVisits;
+  const [allVisits, setAllVisits] = useState(DB.getVisits());
+  const [showAdd, setShowAdd] = useState(false);
+  const [visitForm, setVisitForm] = useState({ projectId:'', date:'', time:'', location:'', purpose:'', notes:'' });
+  const [err, setErr] = useState('');
 
-  const getProject = (id) => projects.find(p=>p.id===id);
+  const visits = user.role==='engineer' ? allVisits.filter(v=>v.engineerId===user.id) : allVisits;
+  const myProjects = user.role==='engineer' ? allProjects.filter(p=>p.engineerId===user.id) : allProjects;
+
+  const reload = () => { setAllVisits(DB.getVisits()); setAllProjects(DB.getProjects()); };
+
+  const getProject = (id) => allProjects.find(p=>p.id===id);
   const getEngineer = (id) => engineers.find(e=>e.id===id);
+
+  const addVisit = () => {
+    if (!visitForm.date || !visitForm.location) { setErr('يرجى تعبئة التاريخ والموقع'); return; }
+    const visit = { ...visitForm, id:uid(), engineerId:user.id, createdAt:new Date().toISOString().slice(0,10) };
+    DB.saveVisits([...DB.getVisits(), visit]);
+    reload();
+    setShowAdd(false);
+    setVisitForm({ projectId:'', date:'', time:'', location:'', purpose:'', notes:'' });
+    setErr('');
+  };
 
   return (
     <div className="fade-in space-y-5">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800">{user.role==='engineer'?'زياراتي الميدانية':'الزيارات الميدانية'}</h2>
-        <p className="text-slate-500 text-sm mt-1">{visits.length} زيارة مسجلة</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">{user.role==='engineer'?'زياراتي الميدانية':'الزيارات الميدانية'}</h2>
+          <p className="text-slate-500 text-sm mt-1">{visits.length} زيارة مسجلة</p>
+        </div>
+        {user.role==='engineer' && <Btn onClick={()=>setShowAdd(true)}>➕ تسجيل زيارة</Btn>}
       </div>
+
       {visits.length===0 ? (
-        <div className="bg-white rounded-2xl card-shadow text-center py-16 text-slate-400">لا توجد زيارات ميدانية مسجلة</div>
+        <div className="bg-white rounded-2xl card-shadow text-center py-16 text-slate-400">
+          <div className="text-4xl mb-3">🗺️</div>
+          <div>لا توجد زيارات ميدانية مسجلة</div>
+          {user.role==='engineer' && <button onClick={()=>setShowAdd(true)} className="mt-3 text-blue-500 text-sm underline">سجّل أول زيارة</button>}
+        </div>
       ) : (
         <div className="space-y-3">
           {visits.sort((a,b)=>b.date.localeCompare(a.date)).map(v=>{
@@ -1117,7 +1142,7 @@ function VisitsPage({ user }) {
                       <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{fmtDate(v.date)}{v.time && ` - ${v.time}`}</span>
                     </div>
                     <div className="text-sm text-slate-500 mt-1">
-                      {proj && <span>مشروع: <span className="text-blue-600 font-medium">{proj.clientName}</span> ({proj.projectNo})</span>}
+                      {proj ? <span>مشروع: <span className="text-blue-600 font-medium">{proj.clientName}</span> ({proj.projectNo})</span> : v.projectId ? null : <span className="text-slate-400">بدون مشروع محدد</span>}
                       {user.role==='manager' && eng && <span> · {eng.name}</span>}
                     </div>
                     {v.purpose && <div className="text-sm text-slate-600 mt-1">الغرض: {v.purpose}</div>}
@@ -1129,6 +1154,27 @@ function VisitsPage({ user }) {
           })}
         </div>
       )}
+
+      <Modal open={showAdd} onClose={()=>setShowAdd(false)} title="تسجيل زيارة ميدانية">
+        <div className="space-y-4">
+          {err && <div className="bg-red-50 text-red-600 rounded-xl p-3 text-sm">{err}</div>}
+          <Select label="المشروع (اختياري)" value={visitForm.projectId} onChange={e=>setVisitForm(f=>({...f,projectId:e.target.value}))}>
+            <option value="">بدون مشروع محدد</option>
+            {myProjects.map(p=><option key={p.id} value={p.id}>{p.clientName} - {p.projectNo}</option>)}
+          </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="التاريخ" type="date" value={visitForm.date} onChange={e=>setVisitForm(f=>({...f,date:e.target.value}))} required/>
+            <Input label="الوقت" type="time" value={visitForm.time} onChange={e=>setVisitForm(f=>({...f,time:e.target.value}))}/>
+          </div>
+          <Input label="الموقع" value={visitForm.location} onChange={e=>setVisitForm(f=>({...f,location:e.target.value}))} placeholder="المدينة - الحي - العنوان" required/>
+          <Input label="الغرض من الزيارة" value={visitForm.purpose} onChange={e=>setVisitForm(f=>({...f,purpose:e.target.value}))} placeholder="مثال: معاينة الموقع، متابعة التنفيذ..."/>
+          <Textarea label="ملاحظات" value={visitForm.notes} onChange={e=>setVisitForm(f=>({...f,notes:e.target.value}))} placeholder="أي تفاصيل إضافية..."/>
+          <div className="flex gap-3 pt-1">
+            <Btn onClick={addVisit} className="flex-1">✅ تسجيل الزيارة</Btn>
+            <Btn variant="secondary" onClick={()=>setShowAdd(false)} className="flex-1">إلغاء</Btn>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
