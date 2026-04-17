@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الحمدان للاستشارات الهندسية</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { font-family: 'Tajawal', sans-serif; }
+  .gradient-blue { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%); }
+  .gradient-header { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%); }
+  .card-shadow { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+  .sidebar-active { background: linear-gradient(135deg, #1e40af, #3b82f6); }
+  .status-new { background:#dbeafe; color:#1e40af; }
+  .status-in_progress { background:#fef3c7; color:#d97706; }
+  .status-pending_client { background:#ede9fe; color:#7c3aed; }
+  .status-pending_authority { background:#fee2e2; color:#dc2626; }
+  .status-completed { background:#d1fae5; color:#065f46; }
+  .status-cancelled { background:#f1f5f9; color:#64748b; }
+  .fade-in { animation: fadeIn 0.3s ease-in; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .modal-overlay { backdrop-filter: blur(4px); }
+  input, select, textarea { font-family: 'Tajawal', sans-serif !important; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+  .logo-shape { filter: drop-shadow(0 4px 12px rgba(30,64,175,0.3)); }
+  .print-hide { }
+  @media print { .print-hide { display:none!important; } }
+</style>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        primary: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 300:'#93c5fd', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8', 800:'#1e40af', 900:'#1e3a8a' }
+      }
+    }
+  }
+}
+</script>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ==================== CONSTANTS ====================
+const SERVICE_TYPES = [
+  { id:'license', label:'اصدار رخص' },
+  { id:'supervision', label:'اشراف هندسي' },
+  { id:'correction', label:'تصحيح وضع قائم' },
+  { id:'plans', label:'اعداد مخططات' },
+  { id:'renovation_license', label:'اصدار رخصة ترميم' },
+  { id:'license_renewal', label:'تجديد رخصة' },
+  { id:'subdivision', label:'تجزئة' },
+  { id:'merge', label:'دمج' },
+  { id:'interior_design', label:'تصميم داخلي' },
+  { id:'construction_license', label:'رخصة تشييد موقع' },
+];
+const DEPARTMENTS = [
+  { id:'consulting', label:'استشاري' },
+  { id:'engineering', label:'هندسي' },
+  { id:'ac', label:'تكييف' },
+];
+const PROJECT_STATUSES = [
+  { id:'new', label:'جديد' },
+  { id:'in_progress', label:'قيد التنفيذ' },
+  { id:'pending_client', label:'انتظار موافقة العميل' },
+  { id:'pending_authority', label:'انتظار الجهة' },
+  { id:'completed', label:'منتهي' },
+  { id:'cancelled', label:'ملغي' },
+];
+const PLAN_STATUSES = [
+  { id:'not_started', label:'لم يبدأ' },
+  { id:'in_progress', label:'قيد الإعداد' },
+  { id:'submitted', label:'تم التسليم' },
+  { id:'approved', label:'معتمد' },
+  { id:'rejected', label:'مرفوض' },
+];
+
+// ==================== STORAGE ====================
+const DB = {
+  getUsers: () => JSON.parse(localStorage.getItem('hec_users') || '[]'),
+  saveUsers: (u) => localStorage.setItem('hec_users', JSON.stringify(u)),
+  getProjects: () => JSON.parse(localStorage.getItem('hec_projects') || '[]'),
+  saveProjects: (p) => localStorage.setItem('hec_projects', JSON.stringify(p)),
+  getVisits: () => JSON.parse(localStorage.getItem('hec_visits') || '[]'),
+  saveVisits: (v) => localStorage.setItem('hec_visits', JSON.stringify(v)),
+  getCurrentUser: () => JSON.parse(sessionStorage.getItem('hec_current') || 'null'),
+  setCurrentUser: (u) => sessionStorage.setItem('hec_current', JSON.stringify(u)),
+  clearCurrentUser: () => sessionStorage.removeItem('hec_current'),
+};
+
+// Seed default data
+function seedData() {
+  if (DB.getUsers().length === 0) {
+    DB.saveUsers([
+      { id:'1', name:'المدير العام', username:'admin', password:'Admin@Hamdan25', role:'manager', department:'consulting' },
+      { id:'2', name:'م. الخطيب', username:'alkhatib', password:'Khatib@2025', role:'engineer', department:'consulting' },
+      { id:'3', name:'م. طارق', username:'tariq', password:'Tariq@2025', role:'engineer', department:'engineering', title:'مدير القسم الهندسي' },
+      { id:'4', name:'م. علاء', username:'alaa', password:'Alaa@2025', role:'engineer', department:'engineering' },
+      { id:'5', name:'م. أحمد', username:'ahmed', password:'Ahmed@2025', role:'engineer', department:'engineering' },
+      { id:'6', name:'م. محمد', username:'mohammed', password:'Mohammed@2025', role:'engineer', department:'engineering' },
+      { id:'7', name:'م. الزبير', username:'alzubair', password:'Zubair@2025', role:'engineer', department:'engineering' },
+      { id:'8', name:'م. محمد كنيش', username:'mkunish', password:'Kunish@2025', role:'engineer', department:'ac', title:'مدير قسم التكييف' },
+    ]);
+    DB.saveProjects([]);
+    DB.saveVisits([]);
+  }
+}
+seedData();
+
+// ==================== HELPERS ====================
+const fmt = (n) => Number(n||0).toLocaleString('ar-SA');
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('ar-SA') : '-';
+const uid = () => Math.random().toString(36).substr(2,9);
+const getLabelById = (arr, id) => arr.find(x=>x.id===id)?.label || id;
+const statusClass = (s) => `status-${s}`;
+
+// ==================== LOGO SVG ====================
+function Logo({ size = 60, showText = true }) {
+  return (
+    <svg width={size} height={showText ? size * 1.5 : size} viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" className="logo-shape">
+      <defs>
+        <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#60a5fa"/>
+          <stop offset="50%" stopColor="#3b82f6"/>
+          <stop offset="100%" stopColor="#1d4ed8"/>
+        </linearGradient>
+        <linearGradient id="grayGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#cbd5e1"/>
+          <stop offset="50%" stopColor="#94a3b8"/>
+          <stop offset="100%" stopColor="#64748b"/>
+        </linearGradient>
+        <linearGradient id="darkBlueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#1e40af"/>
+          <stop offset="100%" stopColor="#1e3a8a"/>
+        </linearGradient>
+      </defs>
+      {/* Left cube - gray */}
+      <polygon points="55,30 100,5 100,75 55,100" fill="url(#grayGrad)" opacity="0.9"/>
+      <polygon points="55,30 10,55 10,125 55,100" fill="#78909C" opacity="0.85"/>
+      <polygon points="55,100 10,125 55,150 100,125" fill="#90A4AE" opacity="0.8"/>
+      {/* Right cube - blue */}
+      <polygon points="100,5 145,30 145,100 100,75" fill="url(#blueGrad)" opacity="0.9"/>
+      <polygon points="145,30 190,55 190,125 145,100" fill="#1e40af" opacity="0.85"/>
+      <polygon points="100,75 145,100 100,125 55,100" fill="url(#darkBlueGrad)" opacity="0.9"/>
+      {/* Center overlap highlight */}
+      <polygon points="100,5 100,75 55,100 100,125 145,100 100,75" fill="url(#blueGrad)" opacity="0.3"/>
+      {showText && (
+        <>
+          <text x="100" y="195" textAnchor="middle" fontSize="18" fontWeight="700" fill="#1e40af" fontFamily="Tajawal,sans-serif">الحمدان للاستشارات</text>
+          <text x="100" y="218" textAnchor="middle" fontSize="18" fontWeight="700" fill="#1e40af" fontFamily="Tajawal,sans-serif">الهندسية</text>
+          <text x="100" y="245" textAnchor="middle" fontSize="10" fill="#64748b" fontFamily="Tajawal,sans-serif">Alhamdan For Consulting Engineering</text>
+        </>
+      )}
+    </svg>
+  );
+}
+
+// ==================== COMPONENTS ====================
+function Badge({ status }) {
+  const s = PROJECT_STATUSES.find(x=>x.id===status);
+  return <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${statusClass(status)}`}>{s?.label||status}</span>;
+}
+
+function Card({ title, value, sub, icon, color='blue' }) {
+  const colors = { blue:'from-blue-500 to-blue-700', green:'from-emerald-500 to-emerald-700', amber:'from-amber-500 to-amber-600', purple:'from-purple-500 to-purple-700', slate:'from-slate-500 to-slate-700' };
+  return (
+    <div className="bg-white rounded-2xl card-shadow p-5 flex items-center gap-4">
+      <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${colors[color]} flex items-center justify-center text-white text-2xl flex-shrink-0`}>{icon}</div>
+      <div>
+        <div className="text-2xl font-bold text-slate-800">{value}</div>
+        <div className="text-sm font-medium text-slate-600">{title}</div>
+        {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+function Modal({ open, onClose, title, children, size='md' }) {
+  if (!open) return null;
+  const sizes = { sm:'max-w-sm', md:'max-w-lg', lg:'max-w-2xl', xl:'max-w-4xl' };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black/40" onClick={onClose}>
+      <div className={`bg-white rounded-2xl shadow-2xl w-full ${sizes[size]} max-h-[90vh] overflow-y-auto`} onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+        <div className="p-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function Input({ label, required, ...props }) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-slate-700 mb-1.5">{label}{required && <span className="text-red-500 mr-1">*</span>}</label>
+      <input className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition" {...props}/>
+    </div>
+  );
+}
+
+function Select({ label, required, children, ...props }) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-slate-700 mb-1.5">{label}{required && <span className="text-red-500 mr-1">*</span>}</label>
+      <select className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition bg-white" {...props}>{children}</select>
+    </div>
+  );
+}
+
+function Textarea({ label, required, ...props }) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-slate-700 mb-1.5">{label}{required && <span className="text-red-500 mr-1">*</span>}</label>
+      <textarea className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition resize-none" rows="3" {...props}/>
+    </div>
+  );
+}
+
+function Btn({ children, variant='primary', size='md', className='', ...props }) {
+  const base = 'inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition focus:outline-none ';
+  const variants = {
+    primary: 'gradient-blue text-white hover:opacity-90 shadow-md shadow-blue-500/20',
+    secondary: 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+    danger: 'bg-red-50 text-red-600 hover:bg-red-100',
+    ghost: 'text-slate-600 hover:bg-slate-100',
+    success: 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-500/20',
+  };
+  const sizes = { sm:'px-3 py-1.5 text-sm', md:'px-5 py-2.5 text-sm', lg:'px-6 py-3 text-base' };
+  return <button className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...props}>{children}</button>;
+}
+
+// ==================== LOGIN ====================
+function Login({ onLogin }) {
+  const [form, setForm] = useState({ username:'', password:'' });
+  const [error, setError] = useState('');
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const handle = (e) => {
+    e.preventDefault();
+    const users = DB.getUsers();
+    const user = users.find(u => u.username === form.username && u.password === form.password);
+    if (user) { DB.setCurrentUser(user); onLogin(user); }
+    else setError('اسم المستخدم أو كلمة المرور غير صحيحة');
+  };
+
+  return (
+    <div className="min-h-screen gradient-header flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 fade-in">
+        <div className="flex flex-col items-center mb-8">
+          <Logo size={80} showText={false}/>
+          <h1 className="text-xl font-bold text-slate-800 mt-4">الحمدان للاستشارات الهندسية</h1>
+          <p className="text-slate-500 text-sm mt-1">نظام إدارة المشاريع الهندسية</p>
+        </div>
+        <form onSubmit={handle} className="space-y-4">
+          {error && <div className="bg-red-50 text-red-600 rounded-xl p-3 text-sm text-center">{error}</div>}
+          <Input label="اسم المستخدم" value={form.username} onChange={e=>set('username',e.target.value)} placeholder="أدخل اسم المستخدم" required/>
+          <Input label="كلمة المرور" type="password" value={form.password} onChange={e=>set('password',e.target.value)} placeholder="أدخل كلمة المرور" required/>
+          <Btn type="submit" className="w-full" size="lg">تسجيل الدخول</Btn>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ==================== SIDEBAR ====================
+function Sidebar({ user, active, setActive, onLogout }) {
+  const managerNav = [
+    { id:'dashboard', icon:'📊', label:'لوحة التحكم' },
+    { id:'engineers', icon:'👷', label:'المهندسين' },
+    { id:'projects', icon:'📋', label:'جميع المشاريع' },
+    { id:'visits', icon:'🗺️', label:'الزيارات الميدانية' },
+    { id:'finance', icon:'💰', label:'التقارير المالية' },
+    { id:'settings', icon:'⚙️', label:'الإعدادات' },
+  ];
+  const engineerNav = [
+    { id:'my_projects', icon:'📋', label:'مشاريعي' },
+    { id:'my_visits', icon:'🗺️', label:'زياراتي الميدانية' },
+    { id:'add_project', icon:'➕', label:'إضافة مشروع' },
+  ];
+  const nav = user.role === 'manager' ? managerNav : engineerNav;
+  const dept = DEPARTMENTS.find(d=>d.id===user.department);
+
+  return (
+    <div className="w-64 bg-slate-900 min-h-screen flex flex-col">
+      {/* Logo area */}
+      <div className="p-5 border-b border-slate-700/50">
+        <div className="flex items-center gap-3">
+          <Logo size={44} showText={false}/>
+          <div>
+            <div className="text-white font-bold text-sm leading-tight">الحمدان للاستشارات</div>
+            <div className="text-blue-400 text-xs">الهندسية</div>
+          </div>
+        </div>
+      </div>
+      {/* User info */}
+      <div className="p-4 border-b border-slate-700/50">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full gradient-blue flex items-center justify-center text-white font-bold text-sm">
+            {user.name.charAt(0)}
+          </div>
+          <div>
+            <div className="text-white text-sm font-semibold">{user.name}</div>
+            <div className="text-slate-400 text-xs">{user.role==='manager'?'مدير عام':dept?.label||''}</div>
+          </div>
+        </div>
+      </div>
+      {/* Nav */}
+      <nav className="flex-1 p-3 space-y-1">
+        {nav.map(item => (
+          <button key={item.id} onClick={()=>setActive(item.id)}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition ${active===item.id?'sidebar-active text-white shadow-lg':'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+            <span className="text-base">{item.icon}</span>
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
+      {/* Logout */}
+      <div className="p-3 border-t border-slate-700/50">
+        <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-slate-800 transition">
+          <span>🚪</span><span>تسجيل الخروج</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ==================== MANAGER DASHBOARD ====================
+function ManagerDashboard({ user }) {
+  const projects = DB.getProjects();
+  const engineers = DB.getUsers().filter(u=>u.role==='engineer');
+  const visits = DB.getVisits();
+  const totalBudget = projects.reduce((s,p)=>s+Number(p.budget||0),0);
+  const totalCollected = projects.reduce((s,p)=>s+p.invoices.filter(i=>i.collected).reduce((a,i)=>a+Number(i.amount),0),0);
+  const totalRemaining = projects.reduce((s,p)=>s+p.payments.filter(pp=>!pp.paid).reduce((a,pp)=>a+Number(pp.amount),0),0);
+  const byStatus = (s) => projects.filter(p=>p.status===s).length;
+
+  return (
+    <div className="fade-in space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-800">لوحة التحكم</h2>
+        <p className="text-slate-500 text-sm mt-1">نظرة عامة على جميع المشاريع والمهندسين</p>
+      </div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card title="إجمالي المشاريع" value={projects.length} icon="📋" color="blue"/>
+        <Card title="المهندسين النشطين" value={engineers.length} icon="👷" color="slate"/>
+        <Card title="الزيارات الميدانية" value={visits.length} icon="🗺️" color="purple"/>
+        <Card title="مشاريع قيد التنفيذ" value={byStatus('in_progress')} icon="⚡" color="amber"/>
+      </div>
+      {/* Finance */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card title="إجمالي الميزانيات" value={`${fmt(totalBudget)} ر.س`} icon="💼" color="blue"/>
+        <Card title="المبالغ المحصلة" value={`${fmt(totalCollected)} ر.س`} icon="✅" color="green"/>
+        <Card title="المبالغ المتبقية" value={`${fmt(totalRemaining)} ر.س`} icon="⏳" color="amber"/>
+      </div>
+      {/* Projects by status */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-2xl card-shadow p-5">
+          <h3 className="font-bold text-slate-700 mb-4">حالة المشاريع</h3>
+          <div className="space-y-3">
+            {PROJECT_STATUSES.map(s => {
+              const cnt = byStatus(s.id);
+              const pct = projects.length ? Math.round(cnt/projects.length*100) : 0;
+              return (
+                <div key={s.id}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-medium text-slate-600">{s.label}</span>
+                    <span className="text-slate-500">{cnt} مشروع ({pct}%)</span>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full gradient-blue transition-all" style={{width:`${pct}%`}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl card-shadow p-5">
+          <h3 className="font-bold text-slate-700 mb-4">المهندسون</h3>
+          <div className="space-y-3">
+            {engineers.map(eng => {
+              const myProjects = projects.filter(p=>p.engineerId===eng.id);
+              const dept = DEPARTMENTS.find(d=>d.id===eng.department);
+              return (
+                <div key={eng.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                  <div className="w-10 h-10 rounded-full gradient-blue flex items-center justify-center text-white font-bold text-sm">{eng.name.charAt(0)}</div>
+                  <div className="flex-1">
+                    <div className="font-semibold text-slate-700 text-sm">{eng.name}</div>
+                    <div className="text-xs text-slate-400">{dept?.label} · {myProjects.length} مشروع</div>
+                  </div>
+                  <div className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">{myProjects.filter(p=>p.status==='in_progress').length} نشط</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      {/* Recent projects */}
+      <div className="bg-white rounded-2xl card-shadow p-5">
+        <h3 className="font-bold text-slate-700 mb-4">آخر المشاريع</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-right text-xs text-slate-500 border-b border-slate-100">
+                <th className="pb-3 font-semibold">رقم المشروع</th>
+                <th className="pb-3 font-semibold">العميل</th>
+                <th className="pb-3 font-semibold">الخدمة</th>
+                <th className="pb-3 font-semibold">الحالة</th>
+                <th className="pb-3 font-semibold">الميزانية</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projects.slice(0,5).map(p=>(
+                <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                  <td className="py-3 font-mono text-xs text-slate-500">{p.projectNo}</td>
+                  <td className="py-3 font-medium">{p.clientName}</td>
+                  <td className="py-3 text-slate-500">{getLabelById(SERVICE_TYPES,p.serviceType)}</td>
+                  <td className="py-3"><Badge status={p.status}/></td>
+                  <td className="py-3 font-semibold text-slate-700">{fmt(p.budget)} ر.س</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==================== ENGINEERS PAGE ====================
+function EngineersPage({ onEdit }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name:'', username:'', password:'', department:'consulting', phone:'', email:'' });
+  const [engineers, setEngineers] = useState(DB.getUsers().filter(u=>u.role==='engineer'));
+  const [err, setErr] = useState('');
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const save = () => {
+    if (!form.name||!form.username||!form.password) { setErr('يرجى ملء جميع الحقول المطلوبة'); return; }
+    const all = DB.getUsers();
+    if (all.find(u=>u.username===form.username)) { setErr('اسم المستخدم مستخدم مسبقاً'); return; }
+    const newUser = { id:uid(), ...form, role:'engineer' };
+    DB.saveUsers([...all, newUser]);
+    setEngineers(DB.getUsers().filter(u=>u.role==='engineer'));
+    setShowAdd(false);
+    setForm({ name:'', username:'', password:'', department:'consulting', phone:'', email:'' });
+    setErr('');
+  };
+
+  const remove = (id) => {
+    if (!confirm('هل أنت متأكد من حذف هذا المهندس؟')) return;
+    DB.saveUsers(DB.getUsers().filter(u=>u.id!==id));
+    setEngineers(DB.getUsers().filter(u=>u.role==='engineer'));
+  };
+
+  return (
+    <div className="fade-in space-y-5">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">المهندسون</h2>
+          <p className="text-slate-500 text-sm mt-1">إدارة حسابات المهندسين</p>
+        </div>
+        <Btn onClick={()=>setShowAdd(true)}>➕ إضافة مهندس</Btn>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {engineers.map(eng => {
+          const projects = DB.getProjects().filter(p=>p.engineerId===eng.id);
+          const dept = DEPARTMENTS.find(d=>d.id===eng.department);
+          return (
+            <div key={eng.id} className="bg-white rounded-2xl card-shadow p-5">
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 rounded-2xl gradient-blue flex items-center justify-center text-white font-bold text-xl">{eng.name.replace('م.','').trim().charAt(0)}</div>
+                <div className="flex-1">
+                  <div className="font-bold text-slate-800">{eng.name}</div>
+                  <div className="text-sm text-slate-500">{dept?.label}</div>
+                  {eng.phone && <div className="text-xs text-slate-400 mt-1">📞 {eng.phone}</div>}
+                  {eng.email && <div className="text-xs text-slate-400">✉️ {eng.email}</div>}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-100">
+                <div className="text-center">
+                  <div className="font-bold text-slate-700">{projects.length}</div>
+                  <div className="text-xs text-slate-400">مشروع</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-blue-600">{projects.filter(p=>p.status==='in_progress').length}</div>
+                  <div className="text-xs text-slate-400">نشط</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-emerald-600">{projects.filter(p=>p.status==='completed').length}</div>
+                  <div className="text-xs text-slate-400">منتهي</div>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button onClick={()=>remove(eng.id)} className="flex-1 py-1.5 text-xs text-red-500 hover:bg-red-50 rounded-lg transition">حذف</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <Modal open={showAdd} onClose={()=>setShowAdd(false)} title="إضافة مهندس جديد">
+        <div className="space-y-4">
+          {err && <div className="bg-red-50 text-red-600 rounded-xl p-3 text-sm">{err}</div>}
+          <Input label="الاسم الكامل" value={form.name} onChange={e=>set('name',e.target.value)} placeholder="م. اسم المهندس" required/>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="اسم المستخدم" value={form.username} onChange={e=>set('username',e.target.value)} placeholder="username" required/>
+            <Input label="كلمة المرور" type="password" value={form.password} onChange={e=>set('password',e.target.value)} placeholder="••••••" required/>
+          </div>
+          <Select label="القسم" value={form.department} onChange={e=>set('department',e.target.value)} required>
+            {DEPARTMENTS.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}
+          </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="رقم الجوال" value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="05xxxxxxxx"/>
+            <Input label="البريد الإلكتروني" value={form.email} onChange={e=>set('email',e.target.value)} placeholder="email@example.com"/>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Btn onClick={save} className="flex-1">حفظ</Btn>
+            <Btn variant="secondary" onClick={()=>setShowAdd(false)} className="flex-1">إلغاء</Btn>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ==================== PROJECTS LIST ====================
+function ProjectsList({ user, onSelectProject, onAddProject }) {
+  const [projects, setProjects] = useState(DB.getProjects());
+  const [filter, setFilter] = useState({ status:'', department:'', serviceType:'', type:'', engineerId:'' });
+  const engineers = DB.getUsers().filter(u=>u.role==='engineer');
+
+  const myProjects = user.role==='engineer' ? projects.filter(p=>p.engineerId===user.id) : projects;
+  const filtered = myProjects.filter(p=>{
+    if (filter.status && p.status!==filter.status) return false;
+    if (filter.department && p.department!==filter.department) return false;
+    if (filter.serviceType && p.serviceType!==filter.serviceType) return false;
+    if (filter.type && p.type!==filter.type) return false;
+    if (filter.engineerId && p.engineerId!==filter.engineerId) return false;
+    return true;
+  });
+
+  const getEngineer = (id) => engineers.find(e=>e.id===id);
+
+  return (
+    <div className="fade-in space-y-5">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">{user.role==='manager'?'جميع المشاريع':'مشاريعي'}</h2>
+          <p className="text-slate-500 text-sm mt-1">{filtered.length} مشروع</p>
+        </div>
+        {user.role==='engineer' && <Btn onClick={onAddProject}>➕ مشروع جديد</Btn>}
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-2xl card-shadow p-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <select className="border border-slate-200 rounded-xl px-3 py-2 text-sm" value={filter.status} onChange={e=>setFilter(f=>({...f,status:e.target.value}))}>
+            <option value="">كل الحالات</option>
+            {PROJECT_STATUSES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+          <select className="border border-slate-200 rounded-xl px-3 py-2 text-sm" value={filter.department} onChange={e=>setFilter(f=>({...f,department:e.target.value}))}>
+            <option value="">كل الأقسام</option>
+            {DEPARTMENTS.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}
+          </select>
+          <select className="border border-slate-200 rounded-xl px-3 py-2 text-sm" value={filter.serviceType} onChange={e=>setFilter(f=>({...f,serviceType:e.target.value}))}>
+            <option value="">كل الخدمات</option>
+            {SERVICE_TYPES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+          <select className="border border-slate-200 rounded-xl px-3 py-2 text-sm" value={filter.type} onChange={e=>setFilter(f=>({...f,type:e.target.value}))}>
+            <option value="">جديد وقديم</option>
+            <option value="new">جديد</option>
+            <option value="old">قديم</option>
+          </select>
+          {user.role==='manager' && (
+            <select className="border border-slate-200 rounded-xl px-3 py-2 text-sm" value={filter.engineerId} onChange={e=>setFilter(f=>({...f,engineerId:e.target.value}))}>
+              <option value="">كل المهندسين</option>
+              {engineers.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          )}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-2xl card-shadow overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr className="text-right text-xs text-slate-500">
+                <th className="px-4 py-3 font-semibold">رقم المشروع</th>
+                <th className="px-4 py-3 font-semibold">العميل</th>
+                <th className="px-4 py-3 font-semibold">الخدمة</th>
+                <th className="px-4 py-3 font-semibold">القسم</th>
+                {user.role==='manager' && <th className="px-4 py-3 font-semibold">المهندس</th>}
+                <th className="px-4 py-3 font-semibold">النوع</th>
+                <th className="px-4 py-3 font-semibold">الحالة</th>
+                <th className="px-4 py-3 font-semibold">موافقة العميل</th>
+                <th className="px-4 py-3 font-semibold">الميزانية</th>
+                <th className="px-4 py-3 font-semibold">تفاصيل</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length===0 && (
+                <tr><td colSpan="10" className="text-center py-12 text-slate-400">لا توجد مشاريع</td></tr>
+              )}
+              {filtered.map(p=>(
+                <tr key={p.id} className="border-b border-slate-50 hover:bg-blue-50/30 transition">
+                  <td className="px-4 py-3 font-mono text-xs text-slate-500">{p.projectNo}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-700">{p.clientName}</td>
+                  <td className="px-4 py-3 text-slate-600">{getLabelById(SERVICE_TYPES,p.serviceType)}</td>
+                  <td className="px-4 py-3 text-slate-500">{getLabelById(DEPARTMENTS,p.department)}</td>
+                  {user.role==='manager' && <td className="px-4 py-3 text-slate-600">{getEngineer(p.engineerId)?.name||'-'}</td>}
+                  <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.type==='new'?'bg-blue-50 text-blue-600':'bg-amber-50 text-amber-600'}`}>{p.type==='new'?'جديد':'قديم'}</span></td>
+                  <td className="px-4 py-3"><Badge status={p.status}/></td>
+                  <td className="px-4 py-3">{p.clientApproval ? <span className="text-emerald-500 text-base">✅</span> : <span className="text-slate-300 text-base">⭕</span>}</td>
+                  <td className="px-4 py-3 font-semibold">{fmt(p.budget)} <span className="text-xs text-slate-400">ر.س</span></td>
+                  <td className="px-4 py-3"><button onClick={()=>onSelectProject(p)} className="text-blue-500 hover:text-blue-700 text-xs font-medium underline">عرض</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==================== PROJECT DETAIL ====================
+function ProjectDetail({ projectId, user, onBack }) {
+  const [project, setProject] = useState(null);
+  const [tab, setTab] = useState('info');
+  const [editMode, setEditMode] = useState(false);
+  const [form, setForm] = useState({});
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [showVisit, setShowVisit] = useState(false);
+  const [invForm, setInvForm] = useState({ amount:'', date:'', description:'', collected:false });
+  const [payForm, setPayForm] = useState({ amount:'', dueDate:'', description:'', paid:false });
+  const [visitForm, setVisitForm] = useState({ date:'', time:'', location:'', purpose:'', notes:'' });
+
+  const load = () => {
+    const p = DB.getProjects().find(x=>x.id===projectId);
+    setProject(p);
+    setForm(p ? {...p} : {});
+  };
+  useEffect(load, [projectId]);
+
+  const engineer = project ? DB.getUsers().find(u=>u.id===project.engineerId) : null;
+  const visits = DB.getVisits().filter(v=>v.projectId===projectId);
+
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const canEdit = user.role==='manager' || (user.role==='engineer' && project?.engineerId===user.id);
+
+  const saveProject = () => {
+    const projs = DB.getProjects().map(p=>p.id===projectId?{...form,updatedAt:new Date().toISOString().slice(0,10)}:p);
+    DB.saveProjects(projs);
+    setEditMode(false);
+    load();
+  };
+
+  const addInvoice = () => {
+    if (!invForm.amount||!invForm.date) return;
+    const inv = {...invForm, id:uid()};
+    const updated = {...project, invoices:[...project.invoices,inv], updatedAt:new Date().toISOString().slice(0,10)};
+    DB.saveProjects(DB.getProjects().map(p=>p.id===projectId?updated:p));
+    setShowInvoice(false);
+    setInvForm({amount:'',date:'',description:'',collected:false});
+    load();
+  };
+
+  const toggleInvoice = (id) => {
+    const updated = {...project, invoices:project.invoices.map(i=>i.id===id?{...i,collected:!i.collected}:i)};
+    DB.saveProjects(DB.getProjects().map(p=>p.id===projectId?updated:p));
+    load();
+  };
+
+  const addPayment = () => {
+    if (!payForm.amount||!payForm.dueDate) return;
+    const pay = {...payForm, id:uid()};
+    const updated = {...project, payments:[...project.payments,pay], updatedAt:new Date().toISOString().slice(0,10)};
+    DB.saveProjects(DB.getProjects().map(p=>p.id===projectId?updated:p));
+    setShowPayment(false);
+    setPayForm({amount:'',dueDate:'',description:'',paid:false});
+    load();
+  };
+
+  const togglePayment = (id) => {
+    const updated = {...project, payments:project.payments.map(pp=>pp.id===id?{...pp,paid:!pp.paid}:pp)};
+    DB.saveProjects(DB.getProjects().map(p=>p.id===projectId?updated:p));
+    load();
+  };
+
+  const addVisit = () => {
+    if (!visitForm.date||!visitForm.location) return;
+    const visit = {...visitForm, id:uid(), projectId, engineerId:user.id, createdAt:new Date().toISOString().slice(0,10)};
+    DB.saveVisits([...DB.getVisits(), visit]);
+    setShowVisit(false);
+    setVisitForm({date:'',time:'',location:'',purpose:'',notes:''});
+    load();
+  };
+
+  if (!project) return <div className="text-center py-20 text-slate-400">جاري التحميل...</div>;
+
+  const totalCollected = project.invoices.filter(i=>i.collected).reduce((s,i)=>s+Number(i.amount),0);
+  const totalRemaining = project.payments.filter(pp=>!pp.paid).reduce((s,pp)=>s+Number(pp.amount),0);
+
+  const tabs = [
+    {id:'info',label:'معلومات المشروع'},
+    {id:'finance',label:'المالية'},
+    {id:'visits',label:`الزيارات الميدانية (${visits.length})`},
+  ];
+
+  return (
+    <div className="fade-in space-y-5">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <button onClick={onBack} className="w-9 h-9 flex items-center justify-center bg-white rounded-xl card-shadow text-slate-500 hover:text-slate-700 transition">←</button>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-slate-800">{project.clientName}</h2>
+            <Badge status={project.status}/>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${project.type==='new'?'bg-blue-50 text-blue-600':'bg-amber-50 text-amber-600'}`}>{project.type==='new'?'جديد':'قديم'}</span>
+          </div>
+          <div className="text-slate-500 text-sm mt-1">{project.projectNo} · {getLabelById(SERVICE_TYPES,project.serviceType)} · {getLabelById(DEPARTMENTS,project.department)}</div>
+        </div>
+        {canEdit && (
+          <div className="flex gap-2">
+            {editMode ? (
+              <>
+                <Btn onClick={saveProject}>💾 حفظ</Btn>
+                <Btn variant="secondary" onClick={()=>{setEditMode(false);setForm({...project});}}>إلغاء</Btn>
+              </>
+            ) : (
+              <Btn variant="secondary" onClick={()=>setEditMode(true)}>✏️ تعديل</Btn>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl card-shadow p-4 text-center">
+          <div className="text-xl font-bold text-blue-600">{fmt(project.budget)}</div>
+          <div className="text-xs text-slate-500 mt-1">الميزانية (ر.س)</div>
+        </div>
+        <div className="bg-white rounded-xl card-shadow p-4 text-center">
+          <div className="text-xl font-bold text-emerald-600">{fmt(totalCollected)}</div>
+          <div className="text-xs text-slate-500 mt-1">محصل (ر.س)</div>
+        </div>
+        <div className="bg-white rounded-xl card-shadow p-4 text-center">
+          <div className="text-xl font-bold text-amber-600">{fmt(totalRemaining)}</div>
+          <div className="text-xs text-slate-500 mt-1">متبقي (ر.س)</div>
+        </div>
+        <div className="bg-white rounded-xl card-shadow p-4 text-center">
+          <div className="text-xl font-bold text-slate-700">{visits.length}</div>
+          <div className="text-xs text-slate-500 mt-1">زيارة ميدانية</div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        {tabs.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${tab===t.id?'bg-white text-blue-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {tab==='info' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="bg-white rounded-2xl card-shadow p-5 space-y-4">
+            <h3 className="font-bold text-slate-700">معلومات المشروع</h3>
+            {editMode ? (
+              <div className="space-y-3">
+                <Input label="اسم العميل" value={form.clientName} onChange={e=>set('clientName',e.target.value)} required/>
+                <Input label="جوال العميل" value={form.clientPhone||''} onChange={e=>set('clientPhone',e.target.value)}/>
+                <div className="grid grid-cols-2 gap-3">
+                  <Select label="نوع المشروع" value={form.type} onChange={e=>set('type',e.target.value)}>
+                    <option value="new">جديد</option>
+                    <option value="old">قديم</option>
+                  </Select>
+                  <Select label="القسم" value={form.department} onChange={e=>set('department',e.target.value)}>
+                    {DEPARTMENTS.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}
+                  </Select>
+                </div>
+                <Select label="نوع الخدمة" value={form.serviceType} onChange={e=>set('serviceType',e.target.value)}>
+                  {SERVICE_TYPES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+                </Select>
+                <Select label="حالة المشروع" value={form.status} onChange={e=>set('status',e.target.value)}>
+                  {PROJECT_STATUSES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+                </Select>
+                <Select label="حالة المخطط" value={form.planStatus} onChange={e=>set('planStatus',e.target.value)}>
+                  {PLAN_STATUSES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+                </Select>
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="clientApproval" checked={form.clientApproval} onChange={e=>set('clientApproval',e.target.checked)} className="w-4 h-4"/>
+                  <label htmlFor="clientApproval" className="text-sm font-medium text-slate-700">موافقة العميل</label>
+                </div>
+                <Input label="الميزانية الإجمالية (ر.س)" type="number" value={form.budget} onChange={e=>set('budget',e.target.value)}/>
+                <Textarea label="ملاحظات" value={form.notes||''} onChange={e=>set('notes',e.target.value)}/>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {[
+                  ['العميل', project.clientName],
+                  ['جوال العميل', project.clientPhone||'-'],
+                  ['نوع المشروع', project.type==='new'?'جديد':'قديم'],
+                  ['القسم', getLabelById(DEPARTMENTS,project.department)],
+                  ['نوع الخدمة', getLabelById(SERVICE_TYPES,project.serviceType)],
+                  ['حالة المشروع', getLabelById(PROJECT_STATUSES,project.status)],
+                  ['حالة المخطط', getLabelById(PLAN_STATUSES,project.planStatus||'not_started')],
+                  ['موافقة العميل', project.clientApproval?'✅ موافق':'⭕ لم يوافق بعد'],
+                  ['الميزانية الإجمالية', `${fmt(project.budget)} ر.س`],
+                  ['تاريخ الإنشاء', fmtDate(project.createdAt)],
+                  ['آخر تحديث', fmtDate(project.updatedAt)],
+                ].map(([k,v])=>(
+                  <div key={k} className="flex justify-between py-2 border-b border-slate-50 last:border-0">
+                    <span className="text-slate-500 text-sm">{k}</span>
+                    <span className="font-medium text-slate-700 text-sm text-left">{v}</span>
+                  </div>
+                ))}
+                {project.notes && (
+                  <div className="bg-blue-50 rounded-xl p-3 text-sm text-slate-600">
+                    <div className="font-semibold text-blue-700 mb-1">ملاحظات:</div>
+                    {project.notes}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl card-shadow p-5">
+            <h3 className="font-bold text-slate-700 mb-4">المهندس المسؤول</h3>
+            {engineer && (
+              <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
+                <div className="w-14 h-14 rounded-2xl gradient-blue flex items-center justify-center text-white font-bold text-xl">{engineer.name.charAt(0)}</div>
+                <div>
+                  <div className="font-bold text-slate-800">{engineer.name}</div>
+                  <div className="text-slate-500 text-sm">{getLabelById(DEPARTMENTS,engineer.department)}</div>
+                  {engineer.phone && <div className="text-xs text-slate-400 mt-1">📞 {engineer.phone}</div>}
+                  {engineer.email && <div className="text-xs text-slate-400">✉️ {engineer.email}</div>}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab==='finance' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* Invoices */}
+          <div className="bg-white rounded-2xl card-shadow p-5">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-slate-700">الفواتير المحصلة</h3>
+              {canEdit && <Btn size="sm" onClick={()=>setShowInvoice(true)}>➕ فاتورة</Btn>}
+            </div>
+            {project.invoices.length===0 ? (
+              <div className="text-center py-8 text-slate-400 text-sm">لا توجد فواتير</div>
+            ) : (
+              <div className="space-y-3">
+                {project.invoices.map(inv=>(
+                  <div key={inv.id} className={`flex items-center gap-3 p-3 rounded-xl border ${inv.collected?'border-emerald-200 bg-emerald-50':'border-slate-200 bg-slate-50'}`}>
+                    <div className="flex-1">
+                      <div className="font-semibold text-slate-700 text-sm">{inv.description||'فاتورة'}</div>
+                      <div className="text-xs text-slate-400">{fmtDate(inv.date)}</div>
+                    </div>
+                    <div className="font-bold text-slate-700">{fmt(inv.amount)} ر.س</div>
+                    {canEdit && (
+                      <button onClick={()=>toggleInvoice(inv.id)} className={`text-xs px-2 py-1 rounded-lg font-medium transition ${inv.collected?'bg-emerald-100 text-emerald-700 hover:bg-emerald-200':'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}>
+                        {inv.collected?'✅ محصلة':'⭕ غير محصلة'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div className="flex justify-between pt-2 border-t border-slate-100 font-bold text-sm">
+                  <span>إجمالي المحصل</span>
+                  <span className="text-emerald-600">{fmt(totalCollected)} ر.س</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Payments */}
+          <div className="bg-white rounded-2xl card-shadow p-5">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-slate-700">جدول الدفعات</h3>
+              {canEdit && <Btn size="sm" onClick={()=>setShowPayment(true)}>➕ دفعة</Btn>}
+            </div>
+            {project.payments.length===0 ? (
+              <div className="text-center py-8 text-slate-400 text-sm">لا توجد دفعات مجدولة</div>
+            ) : (
+              <div className="space-y-3">
+                {project.payments.map(pp=>(
+                  <div key={pp.id} className={`flex items-center gap-3 p-3 rounded-xl border ${pp.paid?'border-blue-200 bg-blue-50':'border-amber-200 bg-amber-50'}`}>
+                    <div className="flex-1">
+                      <div className="font-semibold text-slate-700 text-sm">{pp.description||'دفعة'}</div>
+                      <div className="text-xs text-slate-400">موعد الاستحقاق: {fmtDate(pp.dueDate)}</div>
+                    </div>
+                    <div className="font-bold text-slate-700">{fmt(pp.amount)} ر.س</div>
+                    {canEdit && (
+                      <button onClick={()=>togglePayment(pp.id)} className={`text-xs px-2 py-1 rounded-lg font-medium transition ${pp.paid?'bg-blue-100 text-blue-700 hover:bg-blue-200':'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
+                        {pp.paid?'✅ مدفوعة':'⏳ معلقة'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div className="flex justify-between pt-2 border-t border-slate-100 font-bold text-sm">
+                  <span>إجمالي المتبقي</span>
+                  <span className="text-amber-600">{fmt(totalRemaining)} ر.س</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab==='visits' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="font-bold text-slate-700">الزيارات الميدانية</h3>
+            {canEdit && <Btn onClick={()=>setShowVisit(true)}>➕ تسجيل زيارة</Btn>}
+          </div>
+          {visits.length===0 ? (
+            <div className="bg-white rounded-2xl card-shadow text-center py-12 text-slate-400">لا توجد زيارات ميدانية</div>
+          ) : (
+            <div className="space-y-3">
+              {visits.map(v=>(
+                <div key={v.id} className="bg-white rounded-2xl card-shadow p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-xl flex-shrink-0">🗺️</div>
+                    <div className="flex-1">
+                      <div className="flex gap-3 items-center flex-wrap">
+                        <span className="font-semibold text-slate-700">{v.location}</span>
+                        <span className="text-xs text-slate-400">{fmtDate(v.date)} {v.time && `الساعة ${v.time}`}</span>
+                      </div>
+                      {v.purpose && <div className="text-sm text-slate-600 mt-1">الغرض: {v.purpose}</div>}
+                      {v.notes && <div className="text-sm text-slate-500 mt-1 bg-slate-50 rounded-lg p-2">{v.notes}</div>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modals */}
+      <Modal open={showInvoice} onClose={()=>setShowInvoice(false)} title="إضافة فاتورة">
+        <div className="space-y-4">
+          <Input label="المبلغ (ر.س)" type="number" value={invForm.amount} onChange={e=>setInvForm(f=>({...f,amount:e.target.value}))} required/>
+          <Input label="التاريخ" type="date" value={invForm.date} onChange={e=>setInvForm(f=>({...f,date:e.target.value}))} required/>
+          <Input label="الوصف" value={invForm.description} onChange={e=>setInvForm(f=>({...f,description:e.target.value}))}/>
+          <div className="flex items-center gap-3">
+            <input type="checkbox" id="collected" checked={invForm.collected} onChange={e=>setInvForm(f=>({...f,collected:e.target.checked}))} className="w-4 h-4"/>
+            <label htmlFor="collected" className="text-sm font-medium">تم التحصيل</label>
+          </div>
+          <div className="flex gap-3"><Btn onClick={addInvoice} className="flex-1">إضافة</Btn><Btn variant="secondary" onClick={()=>setShowInvoice(false)} className="flex-1">إلغاء</Btn></div>
+        </div>
+      </Modal>
+
+      <Modal open={showPayment} onClose={()=>setShowPayment(false)} title="إضافة دفعة مجدولة">
+        <div className="space-y-4">
+          <Input label="المبلغ (ر.س)" type="number" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))} required/>
+          <Input label="موعد الاستحقاق" type="date" value={payForm.dueDate} onChange={e=>setPayForm(f=>({...f,dueDate:e.target.value}))} required/>
+          <Input label="الوصف" value={payForm.description} onChange={e=>setPayForm(f=>({...f,description:e.target.value}))}/>
+          <div className="flex gap-3"><Btn onClick={addPayment} className="flex-1">إضافة</Btn><Btn variant="secondary" onClick={()=>setShowPayment(false)} className="flex-1">إلغاء</Btn></div>
+        </div>
+      </Modal>
+
+      <Modal open={showVisit} onClose={()=>setShowVisit(false)} title="تسجيل زيارة ميدانية">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="التاريخ" type="date" value={visitForm.date} onChange={e=>setVisitForm(f=>({...f,date:e.target.value}))} required/>
+            <Input label="الوقت" type="time" value={visitForm.time} onChange={e=>setVisitForm(f=>({...f,time:e.target.value}))}/>
+          </div>
+          <Input label="الموقع" value={visitForm.location} onChange={e=>setVisitForm(f=>({...f,location:e.target.value}))} placeholder="المدينة - الحي" required/>
+          <Input label="الغرض من الزيارة" value={visitForm.purpose} onChange={e=>setVisitForm(f=>({...f,purpose:e.target.value}))}/>
+          <Textarea label="ملاحظات" value={visitForm.notes} onChange={e=>setVisitForm(f=>({...f,notes:e.target.value}))}/>
+          <div className="flex gap-3"><Btn onClick={addVisit} className="flex-1">تسجيل</Btn><Btn variant="secondary" onClick={()=>setShowVisit(false)} className="flex-1">إلغاء</Btn></div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ==================== ADD PROJECT ====================
+function AddProject({ user, onSave, onCancel }) {
+  const engineers = DB.getUsers().filter(u=>u.role==='engineer');
+  const [form, setForm] = useState({
+    projectNo:`HEC-${String(DB.getProjects().length+1).padStart(3,'0')}`,
+    clientName:'', clientPhone:'', type:'new',
+    department: user.role==='engineer' ? user.department : 'consulting',
+    serviceType:'license', status:'new', planStatus:'not_started',
+    clientApproval:false, budget:'', notes:'',
+    engineerId: user.role==='engineer' ? user.id : '',
+  });
+  const [err, setErr] = useState('');
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const save = () => {
+    if (!form.clientName||!form.serviceType||!form.budget) { setErr('يرجى ملء جميع الحقول المطلوبة'); return; }
+    if (!form.engineerId) { setErr('يرجى اختيار المهندس المسؤول'); return; }
+    const newProj = {
+      id:uid(), ...form,
+      budget:Number(form.budget),
+      invoices:[], payments:[],
+      createdAt:new Date().toISOString().slice(0,10),
+      updatedAt:new Date().toISOString().slice(0,10),
+    };
+    DB.saveProjects([...DB.getProjects(), newProj]);
+    onSave(newProj);
+  };
+
+  return (
+    <div className="fade-in space-y-5">
+      <div className="flex items-center gap-4">
+        <button onClick={onCancel} className="w-9 h-9 flex items-center justify-center bg-white rounded-xl card-shadow text-slate-500 hover:text-slate-700">←</button>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">إضافة مشروع جديد</h2>
+        </div>
+      </div>
+      <div className="bg-white rounded-2xl card-shadow p-6 max-w-3xl">
+        <div className="space-y-5">
+          {err && <div className="bg-red-50 text-red-600 rounded-xl p-3 text-sm">{err}</div>}
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="رقم المشروع" value={form.projectNo} onChange={e=>set('projectNo',e.target.value)} required/>
+            <Select label="نوع المشروع" value={form.type} onChange={e=>set('type',e.target.value)} required>
+              <option value="new">جديد</option>
+              <option value="old">قديم</option>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="اسم العميل" value={form.clientName} onChange={e=>set('clientName',e.target.value)} required/>
+            <Input label="جوال العميل" value={form.clientPhone} onChange={e=>set('clientPhone',e.target.value)}/>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Select label="القسم" value={form.department} onChange={e=>set('department',e.target.value)} required>
+              {DEPARTMENTS.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}
+            </Select>
+            <Select label="نوع الخدمة" value={form.serviceType} onChange={e=>set('serviceType',e.target.value)} required>
+              {SERVICE_TYPES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+            </Select>
+          </div>
+          {user.role==='manager' && (
+            <Select label="المهندس المسؤول" value={form.engineerId} onChange={e=>set('engineerId',e.target.value)} required>
+              <option value="">اختر المهندس</option>
+              {engineers.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+            </Select>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <Select label="حالة المشروع" value={form.status} onChange={e=>set('status',e.target.value)}>
+              {PROJECT_STATUSES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+            </Select>
+            <Select label="حالة المخطط" value={form.planStatus} onChange={e=>set('planStatus',e.target.value)}>
+              {PLAN_STATUSES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+            </Select>
+          </div>
+          <Input label="الميزانية الإجمالية (ر.س)" type="number" value={form.budget} onChange={e=>set('budget',e.target.value)} required/>
+          <div className="flex items-center gap-3">
+            <input type="checkbox" id="newClientApproval" checked={form.clientApproval} onChange={e=>set('clientApproval',e.target.checked)} className="w-4 h-4"/>
+            <label htmlFor="newClientApproval" className="text-sm font-medium text-slate-700">العميل وافق على المشروع</label>
+          </div>
+          <Textarea label="ملاحظات" value={form.notes} onChange={e=>set('notes',e.target.value)}/>
+          <div className="flex gap-3 pt-2">
+            <Btn onClick={save} size="lg" className="flex-1">💾 حفظ المشروع</Btn>
+            <Btn variant="secondary" onClick={onCancel} size="lg" className="flex-1">إلغاء</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==================== VISITS PAGE ====================
+function VisitsPage({ user }) {
+  const projects = DB.getProjects();
+  const engineers = DB.getUsers().filter(u=>u.role==='engineer');
+  const allVisits = DB.getVisits();
+  const visits = user.role==='engineer' ? allVisits.filter(v=>v.engineerId===user.id) : allVisits;
+
+  const getProject = (id) => projects.find(p=>p.id===id);
+  const getEngineer = (id) => engineers.find(e=>e.id===id);
+
+  return (
+    <div className="fade-in space-y-5">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-800">{user.role==='engineer'?'زياراتي الميدانية':'الزيارات الميدانية'}</h2>
+        <p className="text-slate-500 text-sm mt-1">{visits.length} زيارة مسجلة</p>
+      </div>
+      {visits.length===0 ? (
+        <div className="bg-white rounded-2xl card-shadow text-center py-16 text-slate-400">لا توجد زيارات ميدانية مسجلة</div>
+      ) : (
+        <div className="space-y-3">
+          {visits.sort((a,b)=>b.date.localeCompare(a.date)).map(v=>{
+            const proj = getProject(v.projectId);
+            const eng = getEngineer(v.engineerId);
+            return (
+              <div key={v.id} className="bg-white rounded-2xl card-shadow p-5">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-2xl flex-shrink-0">🗺️</div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="font-bold text-slate-700">{v.location}</span>
+                      <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{fmtDate(v.date)}{v.time && ` - ${v.time}`}</span>
+                    </div>
+                    <div className="text-sm text-slate-500 mt-1">
+                      {proj && <span>مشروع: <span className="text-blue-600 font-medium">{proj.clientName}</span> ({proj.projectNo})</span>}
+                      {user.role==='manager' && eng && <span> · {eng.name}</span>}
+                    </div>
+                    {v.purpose && <div className="text-sm text-slate-600 mt-1">الغرض: {v.purpose}</div>}
+                    {v.notes && <div className="text-sm text-slate-500 mt-2 bg-slate-50 rounded-xl p-3">{v.notes}</div>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==================== FINANCE REPORT ====================
+function FinanceReport() {
+  const projects = DB.getProjects();
+  const totalBudget = projects.reduce((s,p)=>s+Number(p.budget||0),0);
+  const totalCollected = projects.reduce((s,p)=>s+p.invoices.filter(i=>i.collected).reduce((a,i)=>a+Number(i.amount),0),0);
+  const totalPending = projects.reduce((s,p)=>s+p.invoices.filter(i=>!i.collected).reduce((a,i)=>a+Number(i.amount),0),0);
+  const totalRemaining = projects.reduce((s,p)=>s+p.payments.filter(pp=>!pp.paid).reduce((a,pp)=>a+Number(pp.amount),0),0);
+
+  const byDept = DEPARTMENTS.map(d=>{
+    const dProjects = projects.filter(p=>p.department===d.id);
+    return {
+      dept:d.label,
+      count:dProjects.length,
+      budget:dProjects.reduce((s,p)=>s+Number(p.budget||0),0),
+      collected:dProjects.reduce((s,p)=>s+p.invoices.filter(i=>i.collected).reduce((a,i)=>a+Number(i.amount),0),0),
+    };
+  });
+
+  return (
+    <div className="fade-in space-y-5">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-800">التقارير المالية</h2>
+        <p className="text-slate-500 text-sm mt-1">نظرة عامة على الوضع المالي</p>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card title="إجمالي الميزانيات" value={`${fmt(totalBudget)} ر.س`} icon="💼" color="blue"/>
+        <Card title="إجمالي المحصل" value={`${fmt(totalCollected)} ر.س`} icon="✅" color="green"/>
+        <Card title="فواتير غير محصلة" value={`${fmt(totalPending)} ر.س`} icon="📄" color="amber"/>
+        <Card title="دفعات متبقية" value={`${fmt(totalRemaining)} ر.س`} icon="⏳" color="purple"/>
+      </div>
+
+      <div className="bg-white rounded-2xl card-shadow p-5">
+        <h3 className="font-bold text-slate-700 mb-4">تقرير حسب القسم</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-right text-xs text-slate-500">
+              <tr>
+                <th className="px-4 py-3 font-semibold">القسم</th>
+                <th className="px-4 py-3 font-semibold">عدد المشاريع</th>
+                <th className="px-4 py-3 font-semibold">إجمالي الميزانيات</th>
+                <th className="px-4 py-3 font-semibold">المحصل</th>
+                <th className="px-4 py-3 font-semibold">نسبة التحصيل</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byDept.map(r=>(
+                <tr key={r.dept} className="border-b border-slate-50 hover:bg-slate-50/50">
+                  <td className="px-4 py-3 font-semibold">{r.dept}</td>
+                  <td className="px-4 py-3">{r.count}</td>
+                  <td className="px-4 py-3">{fmt(r.budget)} ر.س</td>
+                  <td className="px-4 py-3 text-emerald-600 font-medium">{fmt(r.collected)} ر.س</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2 bg-slate-100 rounded-full">
+                        <div className="h-full rounded-full bg-emerald-400" style={{width:`${r.budget?Math.round(r.collected/r.budget*100):0}%`}}/>
+                      </div>
+                      <span className="text-xs text-slate-500">{r.budget?Math.round(r.collected/r.budget*100):0}%</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Upcoming payments */}
+      <div className="bg-white rounded-2xl card-shadow p-5">
+        <h3 className="font-bold text-slate-700 mb-4">الدفعات القادمة</h3>
+        <div className="space-y-3">
+          {projects.flatMap(p=>p.payments.filter(pp=>!pp.paid).map(pp=>({...pp,project:p}))).sort((a,b)=>a.dueDate.localeCompare(b.dueDate)).slice(0,10).map(pp=>(
+            <div key={pp.id} className="flex items-center gap-4 p-3 bg-amber-50 rounded-xl border border-amber-200">
+              <div className="flex-1">
+                <div className="font-medium text-slate-700 text-sm">{pp.project.clientName} - {pp.description||'دفعة'}</div>
+                <div className="text-xs text-slate-400">{pp.project.projectNo} · استحقاق: {fmtDate(pp.dueDate)}</div>
+              </div>
+              <div className="font-bold text-amber-700">{fmt(pp.amount)} ر.س</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==================== SETTINGS ====================
+function Settings() {
+  const [users, setUsers] = useState(DB.getUsers());
+  const [msg, setMsg] = useState('');
+
+  const resetData = () => {
+    if (confirm('هل أنت متأكد من إعادة تهيئة البيانات؟ سيتم حذف جميع البيانات!')) {
+      localStorage.clear();
+      seedData();
+      setMsg('تم إعادة تهيئة البيانات بنجاح');
+      setTimeout(()=>setMsg(''),3000);
+    }
+  };
+
+  return (
+    <div className="fade-in space-y-5">
+      <h2 className="text-2xl font-bold text-slate-800">الإعدادات</h2>
+      {msg && <div className="bg-emerald-50 text-emerald-700 rounded-xl p-3 text-sm">{msg}</div>}
+      <div className="bg-white rounded-2xl card-shadow p-5 max-w-lg">
+        <h3 className="font-bold text-slate-700 mb-4">إعدادات النظام</h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+            <div>
+              <div className="font-medium text-slate-700">إعادة تهيئة البيانات</div>
+              <div className="text-xs text-slate-400 mt-0.5">حذف جميع البيانات وإعادة البيانات التجريبية</div>
+            </div>
+            <Btn variant="danger" size="sm" onClick={resetData}>إعادة تهيئة</Btn>
+          </div>
+          <div className="p-4 bg-blue-50 rounded-xl">
+            <div className="font-medium text-blue-700 mb-2">معلومات النظام</div>
+            <div className="text-sm text-slate-600 space-y-1">
+              <div>إجمالي المهندسين: {users.filter(u=>u.role==='engineer').length}</div>
+              <div>إجمالي المشاريع: {DB.getProjects().length}</div>
+              <div>إجمالي الزيارات: {DB.getVisits().length}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==================== MAIN APP ====================
+function App() {
+  const [user, setUser] = useState(DB.getCurrentUser());
+  const [active, setActive] = useState(null);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [addingProject, setAddingProject] = useState(false);
+
+  useEffect(()=>{
+    if (user) {
+      setActive(user.role==='manager'?'dashboard':'my_projects');
+    }
+  },[user]);
+
+  const handleLogin = (u) => {
+    setUser(u);
+    setActive(u.role==='manager'?'dashboard':'my_projects');
+  };
+
+  const handleLogout = () => {
+    DB.clearCurrentUser();
+    setUser(null);
+    setActive(null);
+    setSelectedProject(null);
+    setAddingProject(false);
+  };
+
+  const handleSelectProject = (p) => {
+    setSelectedProject(p.id);
+    setAddingProject(false);
+  };
+
+  const handleAddProject = () => {
+    setAddingProject(true);
+    setSelectedProject(null);
+  };
+
+  const handleProjectSaved = (proj) => {
+    setAddingProject(false);
+    setSelectedProject(proj.id);
+  };
+
+  if (!user) return <Login onLogin={handleLogin}/>;
+
+  const renderContent = () => {
+    if (selectedProject) return <ProjectDetail projectId={selectedProject} user={user} onBack={()=>setSelectedProject(null)}/>;
+    if (addingProject) return <AddProject user={user} onSave={handleProjectSaved} onCancel={()=>setAddingProject(false)}/>;
+
+    switch(active) {
+      case 'dashboard': return <ManagerDashboard user={user}/>;
+      case 'engineers': return <EngineersPage/>;
+      case 'projects': return <ProjectsList user={user} onSelectProject={handleSelectProject} onAddProject={handleAddProject}/>;
+      case 'my_projects': return <ProjectsList user={user} onSelectProject={handleSelectProject} onAddProject={handleAddProject}/>;
+      case 'visits': return <VisitsPage user={user}/>;
+      case 'my_visits': return <VisitsPage user={user}/>;
+      case 'finance': return <FinanceReport/>;
+      case 'add_project': return <AddProject user={user} onSave={handleProjectSaved} onCancel={()=>setActive('my_projects')}/>;
+      case 'settings': return <Settings/>;
+      default: return <ManagerDashboard user={user}/>;
+    }
+  };
+
+  const handleNav = (id) => {
+    setActive(id);
+    setSelectedProject(null);
+    setAddingProject(false);
+  };
+
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar user={user} active={active} setActive={handleNav} onLogout={handleLogout}/>
+      <main className="flex-1 overflow-y-auto">
+        {/* Top bar */}
+        <div className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+          <div className="text-sm text-slate-500">
+            {new Date().toLocaleDateString('ar-SA', {weekday:'long', year:'numeric', month:'long', day:'numeric'})}
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full gradient-blue flex items-center justify-center text-white font-bold text-sm">{user.name.charAt(0)}</div>
+            <span className="text-sm font-medium text-slate-700">{user.name}</span>
+          </div>
+        </div>
+        {/* Content */}
+        <div className="p-6 max-w-7xl mx-auto">
+          {renderContent()}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
