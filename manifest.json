@@ -1,0 +1,27 @@
+{
+  "name": "الحمدان للاستشارات الهندسية",
+  "short_name": "الحمدان",
+  "description": "نظام إدارة الحمدان للاستشارات الهندسية",
+  "start_url": "/alhamdan-engineering/",
+  "scope": "/alhamdan-engineering/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8fafc",
+  "theme_color": "#1e40af",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
