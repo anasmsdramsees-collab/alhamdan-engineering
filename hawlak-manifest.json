@@ -1,8 +1,8 @@
 {
   "name": "حولك لوجيستك",
   "short_name": "حولك",
-  "description": "نظام إدارة التوصيل والشحن — حولك لوجيستك",
-  "start_url": "/alhamdan-engineering/?app=hawlak",
+  "description": "تطبيق السائق — نظام إدارة التوصيل والشحن",
+  "start_url": "/alhamdan-engineering/hawlak.html?app=hawlak",
   "scope": "/alhamdan-engineering/",
   "display": "standalone",
   "orientation": "portrait",
