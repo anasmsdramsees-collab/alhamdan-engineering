@@ -10,8 +10,24 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="الحمدان جروب">
   <title>الحمدان جروب</title>
+  <!-- PWA Manifest — يتحدد بناءً على URL param -->
+  <link id="pwa-manifest" rel="manifest" href="/alhamdan-engineering/hawlak-manifest.json">
+  <script>
+    // لو مفيش ?app=hawlak نستخدم الـ manifest العام
+    if (!new URLSearchParams(location.search).has('app')) {
+      document.getElementById('pwa-manifest').href = '';
+    }
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script type="module" crossorigin src="/alhamdan-engineering/assets/index-Cc8rx-ZQ.js"></script>
+  <script>
+    // تسجيل Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/alhamdan-engineering/sw.js').catch(() => {});
+      });
+    }
+  </script>
+  <script type="module" crossorigin src="/alhamdan-engineering/assets/index-Ce8Znb0D.js"></script>
   <link rel="stylesheet" crossorigin href="/alhamdan-engineering/assets/index-DR2XYWLx.css">
 </head>
 <body class="bg-slate-50 text-slate-800">
