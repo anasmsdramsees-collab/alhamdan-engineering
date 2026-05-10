@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { cloud } from './firebase.js';
 import HawlakApp from './HawlakApp.jsx';
+import FinanceApp from './FinanceApp.jsx';
 
 // ==================== CONSTANTS ====================
 const SERVICE_TYPES = [
@@ -5119,13 +5120,14 @@ function Settings() {
 
 // ==================== MAIN APP ====================
 // ==================== GROUP PORTAL ====================
-function GroupPortal({ onSelectEngineering, onSelectHawlak }) {
+function GroupPortal({ onSelectEngineering, onSelectHawlak, onSelectFinance }) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-[#1a2951] to-slate-800" dir="rtl">
       {/* Animated background blobs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"/>
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-green-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay:'1s'}}/>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl animate-pulse" style={{animationDelay:'2s'}}/>
       </div>
 
       {/* Group Logo */}
@@ -5137,29 +5139,29 @@ function GroupPortal({ onSelectEngineering, onSelectHawlak }) {
           onError={e => { e.target.style.display='none'; }}
         />
         <h1 className="text-white text-3xl font-bold tracking-tight">الحمدان جروب</h1>
-        <p className="text-blue-300 text-sm mt-2">اختر الشركة للدخول إلى نظامها</p>
+        <p className="text-blue-300 text-sm mt-2">اختر النظام للدخول إليه</p>
       </div>
 
       {/* Company cards */}
-      <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-5 w-full max-w-2xl">
+      <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-5 w-full max-w-3xl">
         {/* Engineering card */}
         <button
           onClick={onSelectEngineering}
           className="group bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 rounded-3xl p-6 text-right transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl active:scale-95 backdrop-blur-sm"
         >
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-3 mb-4">
             <img
               src={`${import.meta.env.BASE_URL}hamdan-eng-logo.jpg`}
               alt="الهندسية"
-              className="w-14 h-14 rounded-2xl object-cover shadow-lg"
+              className="w-12 h-12 rounded-2xl object-cover shadow-lg"
               onError={e => { e.target.style.display='none'; }}
             />
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition">🏗️</div>
+            <div className="w-10 h-10 rounded-2xl bg-blue-500/20 flex items-center justify-center text-xl group-hover:scale-110 transition">🏗️</div>
           </div>
-          <h2 className="text-white font-bold text-lg leading-snug">الحمدان للاستشارات<br/>الهندسية والتكييف</h2>
-          <p className="text-blue-300 text-sm mt-2">نظام إدارة المشاريع والعملاء</p>
+          <h2 className="text-white font-bold text-base leading-snug">الحمدان للاستشارات<br/>الهندسية والتكييف</h2>
+          <p className="text-blue-300 text-xs mt-2">نظام إدارة المشاريع والعملاء</p>
           <div className="mt-4 flex items-center gap-2 text-blue-400 text-sm font-semibold group-hover:text-white transition">
-            <span>دخول النظام</span>
+            <span>دخول</span>
             <span className="group-hover:translate-x-[-4px] transition-transform">←</span>
           </div>
         </button>
@@ -5169,19 +5171,36 @@ function GroupPortal({ onSelectEngineering, onSelectHawlak }) {
           onClick={onSelectHawlak}
           className="group bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#4caf50]/50 rounded-3xl p-6 text-right transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl active:scale-95 backdrop-blur-sm"
         >
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-3 mb-4">
             <img
               src={`${import.meta.env.BASE_URL}hawlak-logo.jpg`}
               alt="حولك"
-              className="w-14 h-14 rounded-2xl object-cover shadow-lg"
+              className="w-12 h-12 rounded-2xl object-cover shadow-lg"
               onError={e => { e.target.style.display='none'; }}
             />
-            <div className="w-12 h-12 rounded-2xl bg-green-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition">🚚</div>
+            <div className="w-10 h-10 rounded-2xl bg-green-500/20 flex items-center justify-center text-xl group-hover:scale-110 transition">🚚</div>
           </div>
-          <h2 className="text-white font-bold text-lg leading-snug">حولك لوجيستك</h2>
-          <p className="text-[#4caf50]/80 text-sm mt-2">منصة إدارة التوصيل والشحنات</p>
+          <h2 className="text-white font-bold text-base leading-snug">حولك لوجيستك</h2>
+          <p className="text-[#4caf50]/80 text-xs mt-2">منصة إدارة التوصيل والشحنات</p>
           <div className="mt-4 flex items-center gap-2 text-[#4caf50] text-sm font-semibold group-hover:text-white transition">
-            <span>دخول النظام</span>
+            <span>دخول</span>
+            <span className="group-hover:translate-x-[-4px] transition-transform">←</span>
+          </div>
+        </button>
+
+        {/* Finance card */}
+        <button
+          onClick={onSelectFinance}
+          className="group bg-white/5 hover:bg-white/10 border border-white/10 hover:border-emerald-400/50 rounded-3xl p-6 text-right transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl active:scale-95 backdrop-blur-sm"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-600/30 border border-emerald-400/20 flex items-center justify-center text-2xl shadow-lg">💰</div>
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-xl group-hover:scale-110 transition">📊</div>
+          </div>
+          <h2 className="text-white font-bold text-base leading-snug">إدارة المالية</h2>
+          <p className="text-emerald-300/80 text-xs mt-2">الإيرادات والمصروفات والرواتب</p>
+          <div className="mt-4 flex items-center gap-2 text-emerald-400 text-sm font-semibold group-hover:text-white transition">
+            <span>دخول</span>
             <span className="group-hover:translate-x-[-4px] transition-transform">←</span>
           </div>
         </button>
@@ -5194,11 +5213,12 @@ function GroupPortal({ onSelectEngineering, onSelectHawlak }) {
 
 // ==================== MAIN APP ====================
 function App() {
-  // appSection: 'portal' | 'engineering' | 'hawlak'
+  // appSection: 'portal' | 'engineering' | 'hawlak' | 'finance'
   const [appSection, setAppSection] = useState(() => {
     // URL param ?app=hawlak → opens Hawlak directly (used by driver APK)
     const params = new URLSearchParams(window.location.search);
     if (params.get('app') === 'hawlak') return 'hawlak';
+    if (params.get('app') === 'finance') return 'finance';
     // Remember last section across page reloads
     return sessionStorage.getItem('alhamdan_section') || 'portal';
   });
@@ -5267,12 +5287,17 @@ function App() {
       <GroupPortal
         onSelectEngineering={() => setSection('engineering')}
         onSelectHawlak={() => setSection('hawlak')}
+        onSelectFinance={() => setSection('finance')}
       />
     );
   }
 
   if (appSection === 'hawlak') {
     return <HawlakApp onBack={() => setSection('portal')}/>;
+  }
+
+  if (appSection === 'finance') {
+    return <FinanceApp onBack={() => setSection('portal')}/>;
   }
 
   // Engineering section below ──────────────────────────────────

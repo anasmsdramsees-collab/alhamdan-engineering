@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1400">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Tajawal',sans-serif}
+body{width:1400px;height:900px;overflow:hidden;background:#f1f5f9}
+
+.header{
+  background:linear-gradient(90deg,#1e3a8a,#1d4ed8);
+  height:68px;display:flex;align-items:center;padding:0 28px;gap:16px;
+}
+.logo-mini{display:flex;align-items:center;gap:10px}
+.logo-mini svg{width:36px;height:36px}
+.logo-mini span{color:#fff;font-size:18px;font-weight:700}
+.nav{margin-right:auto;display:flex;gap:6px}
+.nav-item{color:rgba(196,220,255,0.9);font-size:14px;padding:6px 14px;border-radius:8px}
+.nav-item.active{background:rgba(255,255,255,0.15);color:#fff;font-weight:600}
+
+.main{padding:24px 28px}
+.page-title{font-size:24px;font-weight:800;color:#1e293b}
+.page-sub{font-size:14px;color:#94a3b8;margin-top:2px}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px}
+.stat-card{
+  background:#fff;border-radius:18px;padding:20px;display:flex;align-items:center;gap:16px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.06);
+}
+.stat-icon{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.stat-value{font-size:30px;font-weight:800;color:#1e293b}
+.stat-label{font-size:13px;color:#64748b;font-weight:600}
+.stat-sub{font-size:12px;color:#94a3b8;margin-top:2px}
+
+.table-wrap{
+  background:#fff;border-radius:18px;margin-top:20px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.06);overflow:hidden;
+}
+.table-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 24px;border-bottom:1px solid #f1f5f9;
+}
+.table-title{font-size:16px;font-weight:700;color:#1e293b}
+.view-all{font-size:13px;color:#3b82f6;font-weight:600}
+
+table{width:100%;border-collapse:collapse;direction:rtl}
+th{padding:12px 24px;text-align:right;font-size:13px;font-weight:700;color:#64748b;background:#f8fafc;border-bottom:1px solid #f1f5f9}
+td{padding:14px 24px;text-align:right;font-size:14px;color:#334155;border-bottom:1px solid #f8fafc}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafbff}
+
+.badge{display:inline-block;padding:4px 12px;border-radius:8px;font-size:12px;font-weight:700}
+.badge-blue{background:#dbeafe;color:#1d4ed8}
+.badge-green{background:#d1fae5;color:#059669}
+.badge-amber{background:#fef3c7;color:#d97706}
+.badge-purple{background:#ede9fe;color:#7c3aed}
+.badge-red{background:#fee2e2;color:#dc2626}
+.badge-slate{background:#f1f5f9;color:#475569}
+
+.dept{font-size:12px;color:#94a3b8;margin-top:2px}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo-mini">
+    <svg viewBox="0 0 120 100"><polygon points="30,20 60,5 60,50 30,65" fill="#cbd5e1"/><polygon points="60,5 90,20 90,65 60,50" fill="#60a5fa"/><polygon points="30,65 60,50 90,65 60,80" fill="#1d4ed8"/></svg>
+    <span>الحمدان للاستشارات الهندسية</span>
+  </div>
+  <div class="nav">
+    <div class="nav-item active">لوحة التحكم</div>
+    <div class="nav-item">المشاريع</div>
+    <div class="nav-item">العملاء</div>
+    <div class="nav-item">عروض الأسعار</div>
+    <div class="nav-item">الموردين</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="page-title">لوحة التحكم الرئيسية</div>
+  <div class="page-sub">نظرة عامة على أداء الشركة</div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)">🏗️</div>
+      <div>
+        <div class="stat-value">٤٧</div>
+        <div class="stat-label">إجمالي المشاريع</div>
+        <div class="stat-sub">١٢ قيد التنفيذ</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:linear-gradient(135deg,#10b981,#059669)">✅</div>
+      <div>
+        <div class="stat-value">٢٨</div>
+        <div class="stat-label">مشاريع مكتملة</div>
+        <div class="stat-sub">٥٩٪ معدل الإنجاز</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">👥</div>
+      <div>
+        <div class="stat-value">٣٥</div>
+        <div class="stat-label">إجمالي العملاء</div>
+        <div class="stat-sub">٨ عملاء محتملين</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">📋</div>
+      <div>
+        <div class="stat-value">١٩</div>
+        <div class="stat-label">عروض الأسعار</div>
+        <div class="stat-sub">٧ بانتظار الموافقة</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-header">
+      <div class="table-title">آخر المشاريع</div>
+      <div class="view-all">عرض الكل ←</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>اسم المشروع</th>
+          <th>المهندس المسؤول</th>
+          <th>القسم</th>
+          <th>نوع الخدمة</th>
+          <th>الحالة</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>مشروع فيلا الرياض - B12</strong><div class="dept">رخصة تشييد موقع</div></td>
+          <td>م. طارق</td>
+          <td>هندسي</td>
+          <td>رخصة تشييد موقع</td>
+          <td><span class="badge badge-blue">قيد التنفيذ</span></td>
+        </tr>
+        <tr>
+          <td><strong>مجمع الأعمال - الملقا</strong><div class="dept">إشراف هندسي</div></td>
+          <td>م. الخطيب</td>
+          <td>استشاري</td>
+          <td>إشراف هندسي</td>
+          <td><span class="badge badge-green">منتهي</span></td>
+        </tr>
+        <tr>
+          <td><strong>مصنع الأجهزة - الجبيل</strong><div class="dept">أنظمة تكييف مركزية</div></td>
+          <td>م. محمد كنيش</td>
+          <td>تكييف</td>
+          <td>أنظمة التكييف المركزية</td>
+          <td><span class="badge badge-amber">انتظار الجهة</span></td>
+        </tr>
+        <tr>
+          <td><strong>مبنى إداري - حي السليمانية</strong><div class="dept">اعداد مخططات</div></td>
+          <td>م. علاء</td>
+          <td>هندسي</td>
+          <td>اعداد مخططات</td>
+          <td><span class="badge badge-purple">انتظار موافقة العميل</span></td>
+        </tr>
+        <tr>
+          <td><strong>استراحة - شمال الرياض</strong><div class="dept">تصحيح وضع قائم</div></td>
+          <td>م. أحمد</td>
+          <td>هندسي</td>
+          <td>تصحيح وضع قائم</td>
+          <td><span class="badge badge-red">جديد</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>
