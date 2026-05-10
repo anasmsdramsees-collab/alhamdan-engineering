@@ -11,19 +11,14 @@
   <meta name="apple-mobile-web-app-title" content="حولك">
   <meta name="description" content="تطبيق السائق — نظام إدارة التوصيل والشحن حولك لوجيستك">
   <title>حولك لوجيستك — تطبيق السائق</title>
-
-  <!-- PWA Manifest — ثابت دايماً -->
   <link rel="manifest" href="/alhamdan-engineering/hawlak-manifest.json">
   <link rel="apple-touch-icon" href="/alhamdan-engineering/hawlak-icon-192.png">
-
   <script>
-    // ضمان فتح قسم حولك مباشرةً
     if (!new URLSearchParams(location.search).has('app')) {
       var u = new URL(location.href);
       u.searchParams.set('app', 'hawlak');
       history.replaceState(null, '', u.toString());
     }
-    // Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
         navigator.serviceWorker.register('/alhamdan-engineering/sw.js').catch(function(){});
@@ -35,6 +30,6 @@
 </head>
 <body class="bg-slate-50 text-slate-800">
   <div id="root"></div>
-  <script type="module" src="/alhamdan-engineering/assets/index-C6wWo0OO.js"></script>
+  <script type="module" src="/alhamdan-engineering/assets/index-xuhNkqqc.js"></script>
 </body>
 </html>
