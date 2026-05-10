@@ -17,8 +17,8 @@ const FDB = {
 };
 
 const FIN_ACCOUNTS = [
-  { id:'fa1', name:'عبدالرحمن الحمدان', username:'admin',    password:'admin123', role:'manager',  title:'مدير عام' },
-  { id:'fa2', name:'النعمان أحمد',        username:'accounts', password:'acc123',   role:'accounts', title:'مدير مالي' },
+  { id:'fa1', name:'عبدالرحمن الحمدان', username:'admin', password:'Admin@Hamdan25', role:'manager',   title:'مدير عام' },
+  { id:'fa2', name:'النعمان أحمد',        username:'numan', password:'Numan@2025',    role:'accounts',  title:'مدير مالي' },
 ];
 
 // ==================== UTILS ====================
@@ -118,7 +118,7 @@ function FinanceLogin({ onLogin }) {
 
   const handle = (e) => {
     e.preventDefault();
-    const acc = FIN_ACCOUNTS.find(a => a.username === u.trim() && a.password === p);
+    const acc = FIN_ACCOUNTS.find(a => a.username === u.trim() && a.password === p.trim());
     if (!acc) { setErr('اسم المستخدم أو كلمة المرور غير صحيحة'); return; }
     FDB.setSession(acc);
     onLogin(acc);
