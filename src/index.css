@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+
+* { font-family: 'Tajawal', sans-serif; }
+.gradient-blue { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%); }
+.gradient-header { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%); }
+.card-shadow { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+.sidebar-active { background: linear-gradient(135deg, #1e40af, #3b82f6); }
+.status-new { background:#dbeafe; color:#1e40af; }
+.status-in_progress { background:#fef3c7; color:#d97706; }
+.status-pending_client { background:#ede9fe; color:#7c3aed; }
+.status-pending_authority { background:#fee2e2; color:#dc2626; }
+.status-completed { background:#d1fae5; color:#065f46; }
+.status-cancelled { background:#f1f5f9; color:#64748b; }
+.fade-in { animation: fadeIn 0.3s ease-in; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.modal-overlay { backdrop-filter: blur(4px); }
+input, select, textarea { font-family: 'Tajawal', sans-serif !important; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+.logo-shape { filter: drop-shadow(0 4px 12px rgba(30,64,175,0.3)); }
+
+/* ── Hawlak Brand Identity ─────────────────────────────────────── */
+.hawlak-app {
+  font-family: 'Cairo', 'Poppins', 'Tajawal', sans-serif;
+  --hw-navy:   #1e2d7a;
+  --hw-navy2:  #172466;
+  --hw-green:  #3d7c34;
+  --hw-green2: #336b2d;
+  --hw-bg:     #f0f2f8;
+}
+.hawlak-app input,
+.hawlak-app select,
+.hawlak-app textarea,
+.hawlak-app button {
+  font-family: 'Cairo', 'Poppins', 'Tajawal', sans-serif !important;
+}
+.hawlak-login-bg {
+  background: linear-gradient(160deg, #1a2766 0%, #1e2d7a 40%, #162058 100%);
+}
+.hawlak-green-glow {
+  background: radial-gradient(circle at 15% 85%, rgba(61,124,52,0.35) 0%, transparent 55%),
+              radial-gradient(circle at 85% 15%, rgba(61,124,52,0.25) 0%, transparent 55%);
+}
+.sidebar-drawer { transform: translateX(100%); transition: transform 0.3s ease; }
+.sidebar-drawer.open { transform: translateX(0); }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 768px) {
+  .mobile-full { width: 100% !important; }
+  .mobile-stack { flex-direction: column !important; }
+  .mobile-p { padding: 1rem !important; }
+}

@@ -1,0 +1,20 @@
+{
+  "appId": "com.hawlak.driver",
+  "appName": "حولك",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#1e2d7a",
+    "overrideUserAgent": "HawlakDriver/1.0"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#1e2d7a",
+      "showSpinner": false
+    }
+  }
+}

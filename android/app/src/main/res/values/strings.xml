@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">حولك</string>
+    <string name="title_activity_main">حولك</string>
+    <string name="package_name">com.hawlak.driver</string>
+    <string name="custom_url_scheme">com.hawlak.driver</string>
+</resources>
