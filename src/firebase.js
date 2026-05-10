@@ -14,6 +14,11 @@ const FIREBASE_CONFIG = {
   appId:             "1:491584344734:web:8acd74512b4ad6e97da18f",
 };
 
+// Hawlak keys synced to Firebase
+export const HAWLAK_KEYS = [
+  'hawlak_users', 'hawlak_shipments', 'hawlak_profiles', 'hawlak_join_requests',
+];
+
 // Keys that get synced to the cloud
 export const CLOUD_KEYS = [
   'hec_projects', 'hec_visits', 'hec_invoices', 'hec_plans',
@@ -170,5 +175,50 @@ export const cloud = {
       snap => callback(snap.exists() ? snap.val() : {}),
       () => callback({})
     );
+  },
+
+  // ─── Hawlak Data Sync ─────────────────────────────────────
+
+  /** Save one hawlak key to Firebase */
+  saveHawlak: (key, data) => {
+    if (!firebaseDB) return;
+    set(ref(firebaseDB, key), data ?? null)
+      .catch(err => console.warn('[Firebase] hawlak save failed:', err));
+  },
+
+  /** Pull all hawlak keys from Firebase into localStorage */
+  loadHawlak: async () => {
+    if (!firebaseDB) return false;
+    try {
+      const snap = await get(ref(firebaseDB, '/'));
+      if (!snap.exists()) return false;
+      const data = snap.val();
+      HAWLAK_KEYS.forEach(key => {
+        if (data[key] !== undefined) {
+          localStorage.setItem(key, JSON.stringify(data[key]));
+        }
+      });
+      return true;
+    } catch (err) {
+      console.warn('[Firebase] loadHawlak failed:', err);
+      return false;
+    }
+  },
+
+  /** Real-time listener for hawlak data changes */
+  subscribeHawlak: (onUpdate) => {
+    if (!firebaseDB) return () => {};
+    const keys = HAWLAK_KEYS;
+    // Listen on root, filter hawlak keys
+    return onValue(ref(firebaseDB, '/'), snap => {
+      if (!snap.exists()) return;
+      const data = snap.val();
+      keys.forEach(key => {
+        if (data[key] !== undefined) {
+          localStorage.setItem(key, JSON.stringify(data[key]));
+        }
+      });
+      onUpdate?.();
+    }, err => console.warn('[Firebase] subscribeHawlak error:', err));
   },
 };

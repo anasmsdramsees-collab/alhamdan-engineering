@@ -7,19 +7,19 @@ const hlsSet = (key, val) => localStorage.setItem(key, JSON.stringify(val));
 
 const HDB = {
   getUsers:          ()  => hls('hawlak_users', []),
-  saveUsers:         (v) => hlsSet('hawlak_users', v),
+  saveUsers:         (v) => { hlsSet('hawlak_users', v);         cloud.saveHawlak('hawlak_users', v); },
   getProfiles:       ()  => hls('hawlak_profiles', {}),   // keyed by userId
-  saveProfiles:      (v) => hlsSet('hawlak_profiles', v),
+  saveProfiles:      (v) => { hlsSet('hawlak_profiles', v);      cloud.saveHawlak('hawlak_profiles', v); },
   getShipments:      ()  => hls('hawlak_shipments', []),
-  saveShipments:     (v) => hlsSet('hawlak_shipments', v),
+  saveShipments:     (v) => { hlsSet('hawlak_shipments', v);     cloud.saveHawlak('hawlak_shipments', v); },
   getLocations:      ()  => hls('hawlak_locations', {}),  // keyed by userId
-  saveLocations:     (v) => hlsSet('hawlak_locations', v),
+  saveLocations:     (v) => hlsSet('hawlak_locations', v),       // locations via setDriverLocation
   getCurrentUser:    ()  => { try { return JSON.parse(sessionStorage.getItem('hawlak_session') || 'null'); } catch { return null; } },
   setCurrentUser:    (u) => sessionStorage.setItem('hawlak_session', JSON.stringify(u)),
   clearCurrentUser:  ()  => sessionStorage.removeItem('hawlak_session'),
   // Join requests
   getJoinRequests:   ()  => hls('hawlak_join_requests', []),
-  saveJoinRequests:  (v) => hlsSet('hawlak_join_requests', v),
+  saveJoinRequests:  (v) => { hlsSet('hawlak_join_requests', v); cloud.saveHawlak('hawlak_join_requests', v); },
 };
 
 // Management accounts — source of truth (always enforced)
@@ -1525,21 +1525,27 @@ function ManagementDashboard({ user, onLogout }) {
   };
 
   useEffect(() => {
-    loadAll();
+    // ── 1. Load from Firebase first, then refresh UI ──────────
+    cloud.loadHawlak().then(() => loadAll());
+
+    // ── 2. Real-time listener: any device saves → all see it ──
+    const unsubHawlak = cloud.subscribeHawlak(() => loadAll());
+
+    // ── 3. Fallback poll every 8s (offline / Firebase off) ───
     const t = setInterval(() => {
       setShipments(HDB.getShipments());
       setDrivers(HDB.getUsers().filter(u => u.role === 'driver'));
       setProfiles(HDB.getProfiles());
-    }, 5000);
+    }, 8000);
 
-    // ── Real-time Firebase listener for driver locations ──────
+    // ── 4. Real-time Firebase listener for driver locations ───
     const unsubLocations = cloud.listenDriverLocations(fbLocs => {
-      // Merge Firebase locations with any localStorage fallback
       setLocations(prev => ({ ...prev, ...fbLocs }));
     });
 
     return () => {
       clearInterval(t);
+      if (typeof unsubHawlak === 'function') unsubHawlak();
       if (typeof unsubLocations === 'function') unsubLocations();
     };
   }, []);
@@ -2918,6 +2924,20 @@ export default function HawlakApp({ onBack }) {
   seedAccounts();
   const [hawlakUser, setHawlakUser] = useState(HDB.getCurrentUser());
   const [driverProfile, setDriverProfile] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+
+  // On mount: pull latest data from Firebase so driver sees up-to-date info
+  useEffect(() => {
+    setSyncing(true);
+    cloud.loadHawlak().then(() => {
+      seedAccounts(); // re-seed after firebase load
+      setSyncing(false);
+      if (hawlakUser?.role === 'driver') {
+        const profiles = HDB.getProfiles();
+        setDriverProfile(profiles[hawlakUser.id] || null);
+      }
+    }).catch(() => setSyncing(false));
+  }, []);
 
   useEffect(() => {
     if (hawlakUser?.role === 'driver') {
@@ -2927,11 +2947,15 @@ export default function HawlakApp({ onBack }) {
   }, [hawlakUser]);
 
   const handleLogin = (u) => {
-    setHawlakUser(u);
-    if (u.role === 'driver') {
-      const profiles = HDB.getProfiles();
-      setDriverProfile(profiles[u.id] || null);
-    }
+    // Pull fresh data from Firebase on login
+    cloud.loadHawlak().then(() => {
+      seedAccounts();
+      setHawlakUser(u);
+      if (u.role === 'driver') {
+        const profiles = HDB.getProfiles();
+        setDriverProfile(profiles[u.id] || null);
+      }
+    });
   };
 
   const handleLogout = () => {
@@ -2957,6 +2981,14 @@ export default function HawlakApp({ onBack }) {
           ← المجموعة
         </button>
       </div>
+      {syncing && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#1e2d7a]/90">
+          <div className="text-center text-white">
+            <div className="text-4xl mb-3 animate-spin">🔄</div>
+            <p className="text-sm font-semibold">جارٍ التزامن...</p>
+          </div>
+        </div>
+      )}
       <HawlakLogin onLogin={handleLogin}/>
     </div>
   );
