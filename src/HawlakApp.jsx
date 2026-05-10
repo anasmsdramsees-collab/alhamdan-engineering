@@ -999,10 +999,47 @@ function DriverDashboard({ user, profile, onLogout }) {
   const [selectedCo, setSelectedCo] = useState(null);
   const [deliveryShipment, setDeliveryShipment] = useState(null);
   const [activeTab, setActiveTab] = useState('today'); // today | all
+  const bgWatchRef = useRef(null);
 
   const load = () => setShipments(HDB.getShipments().filter(s => s.driverId === user.id));
 
   useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, [user.id]);
+
+  // ── Background GPS: share location whenever app is open ──────
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    const sendLocation = (pos) => {
+      cloud.setDriverLocation(user.id, {
+        lat:    pos.coords.latitude,
+        lng:    pos.coords.longitude,
+        ts:     Date.now(),
+        name:   profile?.fullName || user.name,
+        phone:  profile?.phone    || user.phone || '',
+        active: true,
+        online: true,
+      });
+    };
+
+    // Watch position continuously
+    bgWatchRef.current = navigator.geolocation.watchPosition(
+      sendLocation,
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+    );
+
+    // Also send immediately on mount
+    navigator.geolocation.getCurrentPosition(sendLocation, () => {}, { enableHighAccuracy: true, timeout: 10000 });
+
+    return () => {
+      if (bgWatchRef.current != null) {
+        navigator.geolocation.clearWatch(bgWatchRef.current);
+        bgWatchRef.current = null;
+      }
+      // Mark offline but keep last known position
+      cloud.clearDriverLocation(user.id);
+    };
+  }, [user.id]);
 
   const todayShipments = shipments.filter(s => s.createdAt?.slice(0,10) === today());
   const displayed = activeTab === 'today' ? todayShipments : shipments;
@@ -1787,21 +1824,27 @@ function ManagementDashboard({ user, onLogout }) {
 
         {/* ══ TRACKING ══ */}
         {tab === 'tracking' && (() => {
-          const activeDrivers = drivers.filter(d => {
-            const loc = locations[d.id];
-            return loc?.active && (Date.now() - (loc?.ts||0)) < 120000 && loc.lat;
-          });
+          const now = Date.now();
+          // All drivers with ANY location data
+          const driversWithLoc = drivers.filter(d => locations[d.id]?.lat);
+          // Online = location updated in last 5 min
+          const onlineDrivers = driversWithLoc.filter(d => (now - (locations[d.id]?.ts||0)) < 300000);
+          const activeDrivers = onlineDrivers; // alias for map
 
-          // Build Leaflet HTML with all active drivers as markers
+          // Build Leaflet HTML with all located drivers
           const buildMapHtml = (driverList) => {
             const markers = driverList.map(d => {
-              const loc = locations[d.id];
-              const pf  = profiles[d.id];
+              const loc  = locations[d.id];
+              const pf   = profiles[d.id];
               const name = pf?.fullName || d.name;
+              const phone = pf?.phone || d.phone || '';
+              const pending  = todayAll.filter(s => s.driverId === d.id && s.status === 'pending').length;
+              const delivered = todayAll.filter(s => s.driverId === d.id && s.status === 'delivered').length;
+              const secAgo = Math.floor((now - (loc.ts||0)) / 1000);
+              const freshness = secAgo < 30 ? 'live' : secAgo < 120 ? 'recent' : secAgo < 300 ? 'idle' : 'away';
               const ship = loc.shipmentNo || '';
               const dest = loc.destAddress || '';
-              const pending = todayAll.filter(s => s.driverId === d.id && s.status === 'pending').length;
-              return { lat: loc.lat, lng: loc.lng, name, ship, dest, pending };
+              return { lat: loc.lat, lng: loc.lng, name, phone, pending, delivered, freshness, ship, dest, secAgo };
             });
             return `<!DOCTYPE html><html dir="rtl"><head>
 <meta charset="UTF-8">
@@ -1811,35 +1854,50 @@ function ManagementDashboard({ user, onLogout }) {
 <style>
   body{margin:0;padding:0;font-family:Cairo,Tajawal,sans-serif;}
   #map{height:100vh;}
-  .hw-popup{font-size:13px;direction:rtl;text-align:right;min-width:160px;}
-  .hw-popup b{color:#1e2d7a;font-size:14px;}
-  .hw-popup .ship{color:#3d7c34;font-weight:600;margin-top:4px;}
+  .hw-popup{font-size:13px;direction:rtl;text-align:right;min-width:175px;}
+  .hw-popup .dname{color:#1e2d7a;font-size:14px;font-weight:700;}
+  .hw-popup .dphone{color:#64748b;font-size:11px;margin-top:1px;}
+  .hw-popup .status{display:inline-flex;align-items:center;gap:4px;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:600;margin-top:5px;}
+  .hw-popup .stats{display:flex;gap:8px;margin-top:5px;font-size:11px;}
+  .hw-popup .stat{background:#f1f5f9;border-radius:5px;padding:2px 6px;}
+  .hw-popup .ship{color:#3d7c34;font-weight:600;margin-top:4px;font-size:12px;}
   .hw-popup .dest{color:#64748b;font-size:11px;margin-top:2px;}
-  .hw-popup .pend{background:#fef3c7;color:#d97706;border-radius:6px;padding:2px 6px;font-size:11px;margin-top:4px;display:inline-block;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  @keyframes ring{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.8);opacity:0}}
 </style>
 </head><body><div id="map"></div><script>
   const map = L.map('map',{zoomControl:true});
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'© OpenStreetMap'
-  }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
   const drivers = ${JSON.stringify(markers)};
   const bounds = [];
-  const greenIcon = L.divIcon({
-    className:'',
-    html:'<div style="background:#3d7c34;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 0 0 3px #3d7c34,0 2px 6px rgba(0,0,0,0.3);animation:pulse 2s infinite;"></div>',
-    iconSize:[14,14],iconAnchor:[7,7]
-  });
-  const style=document.createElement('style');
-  style.textContent='@keyframes pulse{0%,100%{box-shadow:0 0 0 3px #3d7c34,0 2px 6px rgba(0,0,0,0.3)}50%{box-shadow:0 0 0 6px rgba(61,124,52,0.4),0 2px 6px rgba(0,0,0,0.3)}}';
-  document.head.appendChild(style);
+  function makeIcon(f){
+    const colors={live:'#22c55e',recent:'#3d7c34',idle:'#f59e0b',away:'#94a3b8'};
+    const c=colors[f]||'#94a3b8';
+    const anim=f==='live'?'animation:pulse 1s infinite;':'';
+    const ring=f==='live'?'<div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid '+c+';animation:ring 1.5s infinite;"></div>':'';
+    return L.divIcon({
+      className:'',
+      html:'<div style="position:relative;width:20px;height:20px;">'+ring+'<div style="position:absolute;inset:0;background:'+c+';border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.35);'+anim+'"></div></div>',
+      iconSize:[20,20],iconAnchor:[10,10],popupAnchor:[0,-10]
+    });
+  }
   drivers.forEach(d=>{
-    const marker=L.marker([d.lat,d.lng],{icon:greenIcon}).addTo(map);
-    const popup='<div class="hw-popup"><b>'+d.name+'</b>'+(d.ship?'<div class="ship">🚚 '+d.ship+'</div>':'')+(d.dest?'<div class="dest">📍 '+d.dest+'</div>':'')+(d.pending?'<div class="pend">⏳ '+d.pending+' شحنات معلقة</div>':'')+'</div>';
+    const marker=L.marker([d.lat,d.lng],{icon:makeIcon(d.freshness)}).addTo(map);
+    const sc={live:'background:#dcfce7;color:#15803d',recent:'background:#f0fdf4;color:#16a34a',idle:'background:#fef3c7;color:#d97706',away:'background:#f1f5f9;color:#64748b'};
+    const sl={live:'🟢 متصل الآن',recent:'🟢 نشط',idle:'🟡 خامل',away:'⚪ آخر ظهور'};
+    const timeStr=d.secAgo<60?d.secAgo+'ث':Math.floor(d.secAgo/60)+'د';
+    const popup='<div class="hw-popup"><div class="dname">'+d.name+'</div>'
+      +(d.phone?'<div class="dphone">📞 '+d.phone+'</div>':'')
+      +'<div><span class="status" style="'+sc[d.freshness]+'">'+sl[d.freshness]+' · '+timeStr+'</span></div>'
+      +'<div class="stats"><span class="stat">📦 '+d.pending+' معلقة</span><span class="stat">✅ '+d.delivered+' موصّلة</span></div>'
+      +(d.ship?'<div class="ship">🚚 '+d.ship+'</div>':'')
+      +(d.dest?'<div class="dest">📍 '+d.dest+'</div>':'')
+      +'</div>';
     marker.bindPopup(popup);
     bounds.push([d.lat,d.lng]);
   });
   if(bounds.length===1){map.setView(bounds[0],15);}
-  else if(bounds.length>1){map.fitBounds(bounds,{padding:[40,40]});}
+  else if(bounds.length>1){map.fitBounds(bounds,{padding:[50,50]});}
   else{map.setView([24.7136,46.6753],11);}
 <\/script></body></html>`;
           };
@@ -1854,7 +1912,7 @@ function ManagementDashboard({ user, onLogout }) {
                     <span className="text-white text-sm font-bold">خريطة التتبع</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-white/70 text-xs">{activeDrivers.length} نشط من {drivers.length}</span>
+                    <span className="text-white/70 text-xs">{onlineDrivers.length} متصل · {drivers.length} إجمالي</span>
                     {activeDrivers.length > 0 && (
                       <a
                         href={`https://maps.google.com/maps?q=${activeDrivers.map(d=>`${locations[d.id].lat},${locations[d.id].lng}`).join('|')}`}
@@ -1878,8 +1936,8 @@ function ManagementDashboard({ user, onLogout }) {
                 ) : (
                   <div className="flex flex-col items-center justify-center h-48 bg-slate-50 text-slate-400 gap-2">
                     <div className="text-4xl">🗺️</div>
-                    <p className="text-sm font-medium">لا يوجد سائقون نشطون الآن</p>
-                    <p className="text-xs">تظهر المؤشرات تلقائياً لما يبدأ السائق رحلة</p>
+                    <p className="text-sm font-medium">لا يوجد سائقون متصلون الآن</p>
+                    <p className="text-xs">تظهر المؤشرات تلقائياً لما يفتح السائق التطبيق</p>
                   </div>
                 )}
 
@@ -1911,7 +1969,7 @@ function ManagementDashboard({ user, onLogout }) {
                 {drivers.map(d => {
                   const loc = locations[d.id];
                   const pf  = profiles[d.id];
-                  const isActive = loc?.active && (Date.now() - (loc?.ts||0)) < 120000;
+                  const isActive = loc?.lat && (Date.now() - (loc?.ts||0)) < 300000;
                   const pending  = todayAll.filter(s => s.driverId === d.id && s.status === 'pending');
                   return (
                     <Card key={d.id} className="p-4 space-y-3">
