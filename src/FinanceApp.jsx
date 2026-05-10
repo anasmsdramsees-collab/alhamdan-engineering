@@ -17,8 +17,8 @@ const FDB = {
 };
 
 const FIN_ACCOUNTS = [
-  { id:'fa1', name:'عبدالرحمن الحمدان', username:'admin', password:'Admin@Hamdan25', role:'manager',   title:'مدير عام' },
-  { id:'fa2', name:'النعمان أحمد',        username:'numan', password:'Numan@2025',    role:'accounts',  title:'مدير مالي' },
+  { id:'fa1', name:'عبدالرحمن الحمدان', username:'admin', password:'hamdan2025', role:'manager',  title:'مدير عام' },
+  { id:'fa2', name:'النعمان أحمد',        username:'numan', password:'numan2025',  role:'accounts', title:'مدير مالي' },
 ];
 
 // ==================== UTILS ====================
